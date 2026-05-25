@@ -1,0 +1,165 @@
+{
+  "@@locale": "pl",
+  "appTitle": "godoMyAAC",
+  "profiles": "Profile",
+  "categories": "Kategorie",
+  "library": "Biblioteka",
+  "settings": "Ustawienia",
+  "history": "Historia",
+  "selectProfile": "Wybierz Profil",
+  "addProfile": "Dodaj Profil",
+  "noProfiles": "Brak profili",
+  "addFirstProfile": "Dodaj pierwszy profil aby rozpocząć",
+  "profileSelected": "Wybrano profil: {name}",
+  "@profileSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "editProfile": "Edytuj profil",
+  "deleteProfile": "Usuń profil",
+  "cancel": "Anuluj",
+  "delete": "Usuń",
+  "confirmDeleteProfile": "Czy na pewno chcesz usunąć profil:",
+  "operationIrreversible": "Ta operacja jest nieodwracalna!",
+  "profileDeleted": "✓ Profil usunięty",
+  "error": "Błąd: {message}",
+  "@error": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "addCategory": "Dodaj kategorię",
+  "deleteCategory": "Usuń kategorię",
+  "noCategories": "Brak kategorii",
+  "addFirstCategory": "Dodaj pierwszą kategorię aby rozpocząć",
+  "confirmDeleteCategory": "Czy na pewno chcesz usunąć kategorię \"{name}\"?",
+  "@confirmDeleteCategory": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "categoryDeleted": "✓ Kategoria usunięta",
+  "edit": "Edytuj",
+  "keyboard": "Klawiatura",
+  "about": "O aplikacji",
+  "comingSoon": "Funkcja dostępna wkrótce",
+  "addDefaultCategories": "Dodaj domyślne kategorie",
+  "defaultCategoriesTitle": "Domyślne kategorie",
+  "defaultCategoriesMessage": "Dodać {count} domyślnych kategorii?",
+  "@defaultCategoriesMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "defaultCategoriesAdded": "✓ Dodano {count} kategorii",
+  "@defaultCategoriesAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "add": "Dodaj",
+  "newCategory": "Nowa kategoria",
+  "editCategory": "Edytuj kategorię",
+  "categoryName": "Nazwa kategorii",
+  "categoryNameHint": "np. Jedzenie, Emocje, Czas",
+  "backgroundColor": "Kolor tła",
+  "icon": "Ikona",
+  "changeIcon": "Zmień ikonę",
+  "advanced": "Zaawansowane",
+  "gridColumns": "Kolumny",
+  "gridRows": "Wiersze",
+  "selectIcon": "Wybierz ikonę",
+  "materialIcons": "Ikony",
+  "emoji": "Emoji",
+  "image": "Obrazek",
+  "pickFromGallery": "Wybierz z galerii",
+  "takePhoto": "Zrób zdjęcie",
+  "emojiHint": "Kliknij i wybierz emoji",
+  "selectImageOrGif": "Wybierz obrazek lub GIF",
+  "selectImageDescription": "Możesz wybrać zdjęcie z galerii lub zrobić nowe",
+  "saveChanges": "Zapisz zmiany",
+  "createCategory": "Utwórz kategorię",
+  "categoryCreated": "✓ Kategoria utworzona",
+  "categoryUpdated": "✓ Kategoria zaktualizowana",
+  "iconRequired": "Wybierz ikonę dla kategorii",
+  "nameRequired": "Podaj nazwę kategorii",
+  "nameTooShort": "Nazwa musi mieć min. 2 znaki",
+  "nameTooLong": "Nazwa może mieć max. 30 znaków",
+  "addSymbol": "Dodaj symbol",
+  "editSymbol": "Edytuj symbol",
+  "deleteSymbol": "Usuń symbol",
+  "noSymbols": "Brak symboli",
+  "addFirstSymbol": "Dodaj pierwszy symbol aby rozpocząć",
+  "confirmDeleteSymbol": "Czy na pewno chcesz usunąć symbol \"{name}\"?",
+  "@confirmDeleteSymbol": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "symbolDeleted": "✓ Symbol usunięty",
+  "symbolCreated": "✓ Symbol utworzony",
+  "symbolUpdated": "✓ Symbol zaktualizowany",
+  "searchSymbols": "Szukaj symboli...",
+  "usageCount": "Użycia",
+  "systemSymbol": "Symbol systemowy",
+  "close": "Zamknij",
+  "libraryInfo": "Biblioteka zawiera {count} symboli",
+  "@libraryInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addDefaultSymbols": "Dodaj domyślne symbole",
+  "defaultSymbolsAdded": "✓ Dodano domyślne symbole",
+  "symbolName": "Nazwa symbolu",
+  "symbolNameHint": "np. Dom, Jedzenie, Mama",
+  "tags": "Tagi",
+  "tagsHint": "np. rodzina, emocje (rozdziel przecinkami)",
+  "addSymbolToCategory": "Dodaj symbol do kategorii",
+  "editSymbolInCategory": "Edytuj symbol",
+  "addFromLibrary": "Dodaj z biblioteki",
+  "addFromPhone": "Dodaj z telefonu",
+  "selectFromLibrary": "Wybierz z biblioteki",
+  "searchLibrary": "Szukaj w bibliotece...",
+  "noSymbolsInLibrary": "Brak symboli w bibliotece",
+  "addFirstSymbolToLibrary": "Dodaj pierwszy symbol do biblioteki",
+  "symbolAddedToCategory": "✔ Symbol dodany do kategorii",
+  "selectSymbolFirst": "Wybierz najpierw symbol",
+  "nameOverride": "Własna nazwa (opcjonalnie)",
+  "nameOverrideHint": "Zostaw puste aby użyć nazwy z biblioteki",
+  "imageOverride": "Własny obrazek (opcjonalnie)",
+  "changeImage": "Zmień obrazek",
+  "removeOverride": "Usuń modyfikacje",
+  "resetToDefault": "Przywróć domyślne",
+  "resetToDefaultConfirm": "Przywrócić domyślne wartości z biblioteki?",
+  "symbolResetToDefault": "✔ Przywrócono wartości domyślne",
+  "position": "Pozycja",
+  "deleteFromCategory": "Usuń z kategorii",
+  "deleteFromLibraryToo": "Usunąć też z biblioteki?",
+  "deleteFromLibraryTooDesc": "Symbol zostanie usunięty ze wszystkich kategorii.",
+  "keepInLibrary": "Zachowaj w bibliotece",
+  "deleteEverywhere": "Usuń wszędzie",
+  "voiceRecording": "Nagranie głosu",
+  "recordVoice": "Nagraj głos",
+  "playRecording": "Odtwórz nagranie",
+  "deleteRecording": "Usuń nagranie",
+  "voiceRecordingComingSoon": "Nagrywanie głosu dostępne w Etapie 8",
+  "pickColor": "Wybierz kolor",
+  "recentColors": "Ostatnio użyte",
+  "selectColor": "Wybierz kolor tła"
+}
