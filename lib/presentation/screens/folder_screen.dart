@@ -21,12 +21,7 @@ import '../providers/theme_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/symbols_grid_config_provider.dart';
 import '../widgets/message_container.dart';
-import '../widgets/gaze_indicator.dart';
-import '../widgets/calibration_overlay.dart';
-import '../widgets/dwell_detector.dart';
-import '../providers/eye_tracking_provider.dart';
 import '../widgets/grid_config_dialog.dart';
-import '../../data/services/eye_tracking_service.dart';
 
 class FolderScreen extends ConsumerStatefulWidget {
   final String profileId;
@@ -48,8 +43,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
   bool _isLoading = true;
   bool _isMenuCollapsed = true;
   bool _deleteMode = false;
-  bool _showCalibration = false;
-  bool _isActivatingEyeTracking = false;
 
   @override
   void initState() {
@@ -184,20 +177,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
             ),
           ),
         ),
-        // Gaze indicator overlay
-        const GazeIndicator(),
-        // Calibration overlay - MUSI BYĆ NA KOŃCU (na wierzchu)
-        if (_showCalibration)
-          CalibrationOverlay(
-            onComplete: () {
-              setState(() => _showCalibration = false);
-            },
-            onCancel: () {
-              setState(() => _showCalibration = false);
-              ref.read(isCalibrationActiveProvider.notifier).stop();
-              ref.read(eyeTrackingEnabledProvider.notifier).disable();
-            },
-          ),
       ],
     );
   }
@@ -310,36 +289,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                         onTap: () => _showReorderSheet(context),
                         size: 39,
                       ),
-                      const SizedBox(width: 16),
-
-                      // Eye Tracking
-                      Consumer(
-                        builder: (context, ref, child) {
-                          final isEnabled = ref.watch(eyeTrackingEnabledProvider);
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              _buildCircleButton(
-                                imagePath: isEnabled
-                                    ? 'assets/ui_icons/eye_on.png'
-                                    : 'assets/ui_icons/eye_off.png',
-                                onTap: () => _handleEyeTrackingButtonPress(),
-                                size: 39,
-                                isActive: isEnabled,
-                              ),
-                              if (_isActivatingEyeTracking)
-                                SizedBox(
-                                  width: 48,
-                                  height: 48,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 3,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ],
@@ -393,68 +342,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
         ),
       ),
     );
-  }
-
-  // ========== EYE TRACKING ==========
-
-  Future<void> _toggleEyeTracking() async {
-    final notifier = ref.read(eyeTrackingEnabledProvider.notifier);
-    final isCurrentlyEnabled = ref.read(eyeTrackingEnabledProvider);
-
-    if (isCurrentlyEnabled) {
-      // Wyłącz
-      await notifier.disable();
-    } else {
-      // Włącz i pokaż kalibrację
-      final result = await notifier.enable();
-      if (result.success && mounted) {
-        setState(() {
-          _showCalibration = true;
-          _isMenuCollapsed = true;
-        });
-      } else if (mounted) {
-        // Pokaż odpowiedni komunikat błędu
-        String message;
-        switch (result.error) {
-          case EyeTrackingError.noInternet:
-            message = 'Brak połączenia z internetem. Eye tracking wymaga internetu do aktywacji.';
-            break;
-          case EyeTrackingError.noPermission:
-            message = 'Brak uprawnień do kamery. Włącz uprawnienia w ustawieniach.';
-            break;
-          case EyeTrackingError.expiredKey:
-            message = 'Licencja eye tracking wygasła. Skontaktuj się z deweloperem.';
-            break;
-          case EyeTrackingError.invalidKey:
-            message = 'Nieprawidłowy klucz licencji eye tracking.';
-            break;
-          default:
-            message = 'Nie udało się włączyć eye tracking. Spróbuj ponownie.';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleEyeTrackingButtonPress() async {
-    // Uruchom efekt wizualny
-    setState(() => _isActivatingEyeTracking = true);
-
-    // Równolegle uruchom normalną aktywację eye tracking
-    _toggleEyeTracking();
-
-    // Po 5 sekundach wyłącz efekt wizualny
-    await Future.delayed(const Duration(seconds: 5));
-    if (mounted) {
-      setState(() => _isActivatingEyeTracking = false);
-    }
   }
 
   // ========== BREADCRUMBS ==========
@@ -660,15 +547,12 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
   // ========== CATEGORY CARD ==========
 
   Widget _buildCategoryCard(BuildContext context, CategoryModel category) {
-    final itemKey = GlobalKey();
-
     final card = GestureDetector(
       onTap: _deleteMode
           ? () => _confirmDeleteCategory(context, category)
           : () => context.push('/folder/${widget.profileId}/c/${category.id}'),
       onLongPress: () => _showCategoryMenu(context, category),
       child: Container(
-        key: itemKey,
         decoration: BoxDecoration(
           color: Color(category.backgroundColor),
           borderRadius: BorderRadius.circular(12),
@@ -744,18 +628,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       ),
     );
 
-    // Obuduj w DwellDetector jeśli nie jesteśmy w trybie usuwania
-    if (_deleteMode) {
-      return card;
-    }
-
-    return DwellDetector(
-      itemKey: itemKey,
-      onDwellComplete: () {
-        context.push('/folder/${widget.profileId}/c/${category.id}');
-      },
-      child: card,
-    );
+    // Tryb usuwania vs normalny - tap obsługiwany przez GestureDetector
+    return card;
   }
 
   Widget _buildCategoryIcon(CategoryModel category) {
@@ -782,7 +656,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
 
   Widget _buildSymbolCard(BuildContext context, CategorySymbolModel symbol) {
     final librarySymbolAsync = ref.watch(_librarySymbolProvider(symbol.librarySymbolId));
-    final itemKey = GlobalKey();
 
     return librarySymbolAsync.when(
       data: (librarySymbol) {
@@ -798,7 +671,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
               : () => _handleSymbolTap(symbol, librarySymbol),
           onLongPress: () => _showSymbolInfo(context, symbol, librarySymbol),
           child: Container(
-            key: itemKey,
             decoration: BoxDecoration(
               color: Color(symbol.backgroundColor),
               borderRadius: BorderRadius.circular(12),
@@ -875,16 +747,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
           ),
         );
 
-        // Obuduj w DwellDetector jeśli nie jesteśmy w trybie usuwania
-        if (_deleteMode) {
-          return card;
-        }
-
-        return DwellDetector(
-          itemKey: itemKey,
-          onDwellComplete: () => _handleSymbolTap(symbol, librarySymbol),
-          child: card,
-        );
+        // Tap obsługiwany przez GestureDetector
+        return card;
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),

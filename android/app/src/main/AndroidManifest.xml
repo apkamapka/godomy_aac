@@ -1,7 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Uprawnienia dla kamery i zdjęć -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Uprawnienia dla zdjęć -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -9,8 +7,12 @@
     <!-- Dla Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Dla mikrofonu (nagrywanie głosu) -->
+    <!-- Mikrofon (nagrywanie głosu) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- INTERNET: wymagany przez google_fonts (pobieranie czcionek).
+         Do usunięcia w Etapie 7, gdy czcionki będą zbundlowane lokalnie. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />

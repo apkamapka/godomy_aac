@@ -36,7 +36,3 @@ android {
 flutter {
     source = "../.."
 }
-
-dependencies {
-    implementation("camp.visual.eyedid.android.gazetracker:eyedid-gazetracker:1.0.0-beta4")
-}

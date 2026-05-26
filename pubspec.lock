@@ -297,14 +297,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.0"
-  eyedid_flutter:
-    dependency: "direct main"
-    description:
-      name: eyedid_flutter
-      sha256: d072a8bb1c6d8b32ed5af3b2e68cc1dab4bdb33608b35f3c82caca10cea9b7aa
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0-beta7"
   fake_async:
     dependency: transitive
     description:
