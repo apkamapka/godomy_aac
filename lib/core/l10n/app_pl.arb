@@ -161,5 +161,93 @@
   "voiceRecordingComingSoon": "Nagrywanie głosu dostępne w Etapie 8",
   "pickColor": "Wybierz kolor",
   "recentColors": "Ostatnio użyte",
-  "selectColor": "Wybierz kolor tła"
+  "selectColor": "Wybierz kolor tła",
+  "loadingError": "Błąd ładowania: {message}",
+  "@loadingError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "confirmDeleteCategoryWithContent": "Usunąć \"{name}\" wraz z całą zawartością?",
+  "@confirmDeleteCategoryWithContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "gridSet": "✔ Siatka: {columns} × {rows}",
+  "@gridSet": {
+    "placeholders": {
+      "columns": { "type": "int" },
+      "rows": { "type": "int" }
+    }
+  },
+  "columnsSet": "✓ Kolumny: {count}",
+  "@columnsSet": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noItemsToSort": "Brak elementów do sortowania",
+  "orderSaved": "✓ Kolejność zapisana",
+  "addDefaultCategoriesQuestion": "Dodać domyślne kategorie?",
+  "categoriesAdded": "✓ Kategorie zostały dodane",
+  "addDefaultSymbolsQuestion": "Dodać domyślne symbole?",
+  "symbolsAdded": "✓ Symbole zostały dodane",
+  "noPhoto": "Brak zdjęcia",
+  "pickImageError": "Błąd podczas wybierania zdjęcia: {message}",
+  "@pickImageError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "savingError": "Błąd podczas zapisywania: {message}",
+  "@savingError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "loadingProfileError": "Błąd ładowania profilu: {message}",
+  "@loadingProfileError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "symbolNotFound": "Symbol nie został znaleziony",
+  "librarySymbolNotFound": "Symbol biblioteki nie został znaleziony",
+  "systemSymbolEditable": "To jest symbol systemowy. Możesz go edytować.",
+  "symbolHasOwnRecording": "Symbol ma własne nagranie",
+  "symbolUsesTts": "Symbol użyje syntezy mowy (TTS)",
+  "playbackError": "Błąd odtwarzania: {message}",
+  "@playbackError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "confirmDeleteVoiceRecording": "Czy na pewno chcesz usunąć nagranie głosu?",
+  "enterText": "Wpisz tekst",
+  "enterTextHint": "np. Chcę jeść",
+  "deleteLast": "Usuń ostatni",
+  "clearAll": "Wyczyść wszystko",
+  "deleteThisSymbol": "Usuń ten symbol",
+  "addedItem": "✔ Dodano: \"{name}\"",
+  "@addedItem": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "profileNotFound": "Profil nie znaleziony",
+  "categoryNotFound": "Kategoria nie znaleziona",
+  "addCategoriesFirst": "Najpierw dodaj kategorie!",
+  "newCategoriesAtEnd": "Nowe kategorie zostaną dodane na końcu listy.",
+  "basicCategoriesWillBeAdded": "Zostaną dodane podstawowe kategorie.",
+  "basicSymbolsWillBeAdded": "Zostaną dodane podstawowe symbole do wszystkich istniejących kategorii.",
+  "save": "Zapisz",
+  "grid": "Siatka",
+  "emojiInputHint": "Wpisz lub wybierz emoji z klawiatury",
+  "thisIsSystemSymbol": "To jest symbol systemowy",
+  "noRecording": "Brak nagrania",
+  "recordingSaved": "✔ Nagranie zapisane",
+  "playing": "▶️ Odtwarzanie...",
+  "recordingDeleted": "✔ Nagranie usunięte",
+  "folderEmpty": "Ten folder jest pusty"
 }

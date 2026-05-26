@@ -84,8 +84,9 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd ładowania: $e')),
+          SnackBar(content: Text(l10n.loadingError(e.toString()))),
         );
         context.go('/profiles');
       }
@@ -103,8 +104,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     }
 
     if (_profile == null) {
-      return const Scaffold(
-        body: Center(child: Text('Profil nie znaleziony')),
+      return Scaffold(
+        body: Center(child: Text(l10n.profileNotFound)),
       );
     }
 
@@ -882,7 +883,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Zamknij', style: TextStyle(fontSize: 16)),
+                      child: Text(AppLocalizations.of(context)!.close, style: const TextStyle(fontSize: 16)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -896,7 +897,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Edytuj', style: TextStyle(fontSize: 16)),
+                      child: Text(AppLocalizations.of(context)!.edit, style: const TextStyle(fontSize: 16)),
                     ),
                   ),
                 ],
@@ -1043,7 +1044,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.deleteCategory),
-        content: Text('Usunąć "${category.name}" wraz z całą zawartością?'),
+        content: Text(l10n.confirmDeleteCategoryWithContent(category.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1090,7 +1091,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.deleteSymbol),
-        content: Text('Usunąć symbol "$name"?'),
+        content: Text(l10n.confirmDeleteSymbol(name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1253,7 +1254,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       builder: (context) => GridConfigDialog(
         initialColumns: currentConfig.columns,
         initialRows: currentConfig.rows,
-        title: 'Siatka',
+        title: AppLocalizations.of(context)!.grid,
       ),
     );
 
@@ -1266,9 +1267,10 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       );
 
       if (context.mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✔ Siatka: $columns × $rows'),
+            content: Text(l10n.gridSet(columns, rows)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1291,8 +1293,9 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       });
 
       if (items.isEmpty) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Brak elementów do sortowania')),
+          SnackBar(content: Text(l10n.noItemsToSort)),
         );
         return;
       }
@@ -1347,9 +1350,10 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       ref.invalidate(folderContentProvider(widget.profileId, widget.categoryId));
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Kolejność zapisana'),
+          SnackBar(
+            content: Text(l10n.orderSaved),
             backgroundColor: Colors.green,
           ),
         );
@@ -1357,8 +1361,9 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     } catch (e) {
       print('❌ Błąd zapisywania: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
         );
       }
     }
@@ -1378,7 +1383,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            widget.categoryId == null ? l10n.noCategories : 'Ten folder jest pusty',
+            widget.categoryId == null ? l10n.noCategories : l10n.folderEmpty,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
@@ -1390,7 +1395,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
           ElevatedButton.icon(
             onPressed: () => _showAddDialog(context, l10n),
             icon: const Icon(Icons.add),
-            label: const Text('Dodaj'),
+            label: Text(l10n.add),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
@@ -1724,10 +1729,10 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Dodać domyślne kategorie?'),
+        title: Text(l10n.addDefaultCategoriesQuestion),
         content: Text(existingCategories.isNotEmpty
-            ? 'Nowe kategorie zostaną dodane na końcu listy.'
-            : 'Zostaną dodane podstawowe kategorie.'),
+            ? l10n.newCategoriesAtEnd
+            : l10n.basicCategoriesWillBeAdded),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1735,7 +1740,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Dodaj'),
+            child: Text(l10n.add),
           ),
         ],
       ),
@@ -1751,8 +1756,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Kategorie zostały dodane'),
+          SnackBar(
+            content: Text(l10n.categoriesAdded),
             backgroundColor: Colors.green,
           ),
         );
@@ -1760,7 +1765,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
         );
       }
     }
@@ -1774,8 +1779,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     if (categories.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Najpierw dodaj kategorie!'),
+          SnackBar(
+            content: Text(l10n.addCategoriesFirst),
             backgroundColor: Colors.orange,
           ),
         );
@@ -1786,9 +1791,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Dodać domyślne symbole?'),
-        content: const Text(
-            'Zostaną dodane podstawowe symbole do wszystkich istniejących kategorii.'),
+        title: Text(l10n.addDefaultSymbolsQuestion),
+        content: Text(l10n.basicSymbolsWillBeAdded),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1796,7 +1800,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Dodaj'),
+            child: Text(l10n.add),
           ),
         ],
       ),
@@ -1821,8 +1825,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Symbole zostały dodane'),
+          SnackBar(
+            content: Text(l10n.symbolsAdded),
             backgroundColor: Colors.green,
           ),
         );
@@ -1830,7 +1834,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
         );
       }
     }
@@ -1971,7 +1975,7 @@ class _ReorderBottomSheetState extends ConsumerState<_ReorderBottomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Anuluj'),
+                  child: Text(AppLocalizations.of(context)!.cancel),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1988,7 +1992,7 @@ class _ReorderBottomSheetState extends ConsumerState<_ReorderBottomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Zapisz'),
+                  child: Text(AppLocalizations.of(context)!.save),
                 ),
               ),
             ],

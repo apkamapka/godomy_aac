@@ -1,0 +1,253 @@
+{
+  "@@locale": "en",
+  "appTitle": "godoMyAAC",
+  "profiles": "Profiles",
+  "categories": "Categories",
+  "library": "Library",
+  "settings": "Settings",
+  "history": "History",
+  "selectProfile": "Select Profile",
+  "addProfile": "Add Profile",
+  "noProfiles": "No profiles",
+  "addFirstProfile": "Add your first profile to get started",
+  "profileSelected": "Profile selected: {name}",
+  "@profileSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "editProfile": "Edit profile",
+  "deleteProfile": "Delete profile",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "confirmDeleteProfile": "Are you sure you want to delete this profile:",
+  "operationIrreversible": "This operation cannot be undone!",
+  "profileDeleted": "✓ Profile deleted",
+  "error": "Error: {message}",
+  "@error": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "addCategory": "Add category",
+  "deleteCategory": "Delete category",
+  "noCategories": "No categories",
+  "addFirstCategory": "Add your first category to get started",
+  "confirmDeleteCategory": "Are you sure you want to delete the category \"{name}\"?",
+  "@confirmDeleteCategory": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "categoryDeleted": "✓ Category deleted",
+  "edit": "Edit",
+  "keyboard": "Keyboard",
+  "about": "About",
+  "comingSoon": "Feature coming soon",
+  "addDefaultCategories": "Add default categories",
+  "defaultCategoriesTitle": "Default categories",
+  "defaultCategoriesMessage": "Add {count} default categories?",
+  "@defaultCategoriesMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "defaultCategoriesAdded": "✓ Added {count} categories",
+  "@defaultCategoriesAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "add": "Add",
+  "newCategory": "New category",
+  "editCategory": "Edit category",
+  "categoryName": "Category name",
+  "categoryNameHint": "e.g. Food, Emotions, Time",
+  "backgroundColor": "Background color",
+  "icon": "Icon",
+  "changeIcon": "Change icon",
+  "advanced": "Advanced",
+  "gridColumns": "Columns",
+  "gridRows": "Rows",
+  "selectIcon": "Select icon",
+  "materialIcons": "Icons",
+  "emoji": "Emoji",
+  "image": "Image",
+  "pickFromGallery": "Pick from gallery",
+  "takePhoto": "Take photo",
+  "emojiHint": "Tap and pick an emoji",
+  "selectImageOrGif": "Select an image or GIF",
+  "selectImageDescription": "You can pick a photo from the gallery or take a new one",
+  "saveChanges": "Save changes",
+  "createCategory": "Create category",
+  "categoryCreated": "✓ Category created",
+  "categoryUpdated": "✓ Category updated",
+  "iconRequired": "Select an icon for the category",
+  "nameRequired": "Enter a category name",
+  "nameTooShort": "Name must be at least 2 characters",
+  "nameTooLong": "Name can be at most 30 characters",
+  "addSymbol": "Add symbol",
+  "editSymbol": "Edit symbol",
+  "deleteSymbol": "Delete symbol",
+  "noSymbols": "No symbols",
+  "addFirstSymbol": "Add your first symbol to get started",
+  "confirmDeleteSymbol": "Are you sure you want to delete the symbol \"{name}\"?",
+  "@confirmDeleteSymbol": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "symbolDeleted": "✓ Symbol deleted",
+  "symbolCreated": "✓ Symbol created",
+  "symbolUpdated": "✓ Symbol updated",
+  "searchSymbols": "Search symbols...",
+  "usageCount": "Uses",
+  "systemSymbol": "System symbol",
+  "close": "Close",
+  "libraryInfo": "The library contains {count} symbols",
+  "@libraryInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addDefaultSymbols": "Add default symbols",
+  "defaultSymbolsAdded": "✓ Default symbols added",
+  "symbolName": "Symbol name",
+  "symbolNameHint": "e.g. Home, Food, Mom",
+  "tags": "Tags",
+  "tagsHint": "e.g. family, emotions (separate with commas)",
+  "addSymbolToCategory": "Add symbol to category",
+  "editSymbolInCategory": "Edit symbol",
+  "addFromLibrary": "Add from library",
+  "addFromPhone": "Add from phone",
+  "selectFromLibrary": "Select from library",
+  "searchLibrary": "Search the library...",
+  "noSymbolsInLibrary": "No symbols in the library",
+  "addFirstSymbolToLibrary": "Add the first symbol to the library",
+  "symbolAddedToCategory": "✔ Symbol added to category",
+  "selectSymbolFirst": "Select a symbol first",
+  "nameOverride": "Custom name (optional)",
+  "nameOverrideHint": "Leave empty to use the library name",
+  "imageOverride": "Custom image (optional)",
+  "changeImage": "Change image",
+  "removeOverride": "Remove customizations",
+  "resetToDefault": "Reset to default",
+  "resetToDefaultConfirm": "Reset to the default values from the library?",
+  "symbolResetToDefault": "✔ Default values restored",
+  "position": "Position",
+  "deleteFromCategory": "Remove from category",
+  "deleteFromLibraryToo": "Delete from the library too?",
+  "deleteFromLibraryTooDesc": "The symbol will be removed from all categories.",
+  "keepInLibrary": "Keep in library",
+  "deleteEverywhere": "Delete everywhere",
+  "voiceRecording": "Voice recording",
+  "recordVoice": "Record voice",
+  "playRecording": "Play recording",
+  "deleteRecording": "Delete recording",
+  "voiceRecordingComingSoon": "Voice recording available in Stage 8",
+  "pickColor": "Pick a color",
+  "recentColors": "Recently used",
+  "selectColor": "Select background color",
+  "loadingError": "Loading error: {message}",
+  "@loadingError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "confirmDeleteCategoryWithContent": "Delete \"{name}\" along with all its content?",
+  "@confirmDeleteCategoryWithContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "gridSet": "✔ Grid: {columns} × {rows}",
+  "@gridSet": {
+    "placeholders": {
+      "columns": { "type": "int" },
+      "rows": { "type": "int" }
+    }
+  },
+  "columnsSet": "✓ Columns: {count}",
+  "@columnsSet": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noItemsToSort": "No items to sort",
+  "orderSaved": "✓ Order saved",
+  "addDefaultCategoriesQuestion": "Add default categories?",
+  "categoriesAdded": "✓ Categories added",
+  "addDefaultSymbolsQuestion": "Add default symbols?",
+  "symbolsAdded": "✓ Symbols added",
+  "noPhoto": "No photo",
+  "pickImageError": "Error while selecting the image: {message}",
+  "@pickImageError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "savingError": "Error while saving: {message}",
+  "@savingError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "loadingProfileError": "Error loading profile: {message}",
+  "@loadingProfileError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "symbolNotFound": "Symbol not found",
+  "librarySymbolNotFound": "Library symbol not found",
+  "systemSymbolEditable": "This is a system symbol. You can edit it.",
+  "symbolHasOwnRecording": "Symbol has its own recording",
+  "symbolUsesTts": "Symbol will use text-to-speech (TTS)",
+  "playbackError": "Playback error: {message}",
+  "@playbackError": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "confirmDeleteVoiceRecording": "Are you sure you want to delete the voice recording?",
+  "enterText": "Type text",
+  "enterTextHint": "e.g. I want to eat",
+  "deleteLast": "Delete last",
+  "clearAll": "Clear all",
+  "deleteThisSymbol": "Delete this symbol",
+  "addedItem": "✔ Added: \"{name}\"",
+  "@addedItem": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "profileNotFound": "Profile not found",
+  "categoryNotFound": "Category not found",
+  "addCategoriesFirst": "Add categories first!",
+  "newCategoriesAtEnd": "New categories will be added at the end of the list.",
+  "basicCategoriesWillBeAdded": "Basic categories will be added.",
+  "basicSymbolsWillBeAdded": "Basic symbols will be added to all existing categories.",
+  "save": "Save",
+  "grid": "Grid",
+  "emojiInputHint": "Type or pick an emoji from the keyboard",
+  "thisIsSystemSymbol": "This is a system symbol",
+  "noRecording": "No recording",
+  "recordingSaved": "✔ Recording saved",
+  "playing": "▶️ Playing...",
+  "recordingDeleted": "✔ Recording deleted",
+  "folderEmpty": "This folder is empty"
+}
