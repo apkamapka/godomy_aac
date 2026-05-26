@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/l10n/app_localizations.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -119,16 +120,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               // Loading Indicator
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: const Column(
+                child: Column(
                   children: [
-                    CircularProgressIndicator(
+                    const CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       strokeWidth: 3,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text(
-                      'Ładowanie...',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.loading,
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
                       ),

@@ -35,6 +35,7 @@ class MyApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      locale: const Locale('pl'),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       // Dodaj l10n
@@ -46,7 +47,6 @@ class MyApp extends ConsumerWidget {
       ],
       supportedLocales: const [
         Locale('pl'),
-        Locale('en'),
       ],
     );
   }

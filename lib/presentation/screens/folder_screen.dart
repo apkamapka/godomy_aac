@@ -1547,7 +1547,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                     const SizedBox(height: 12),
                     _buildDrawerItem(
                       icon: Icons.refresh,
-                      label: 'Dodaj domyślne kategorie',
+                      label: l10n.addDefaultCategoriesMenu,
                       color: const Color(0xFFFFB74D),
                       cardColor: cardColor,
                       textColor: textColor,
@@ -1559,7 +1559,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                     const SizedBox(height: 12),
                     _buildDrawerItem(
                       icon: Icons.add_photo_alternate,
-                      label: 'Dodaj domyślne symbole',
+                      label: l10n.addDefaultSymbolsMenu,
                       color: const Color(0xFF42A5F5),
                       cardColor: cardColor,
                       textColor: textColor,
@@ -1640,6 +1640,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
   }
 
   Widget _buildThemeToggle(BuildContext context, Color cardColor, Color textColor) {
+    final l10n = AppLocalizations.of(context)!;
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
 
@@ -1680,7 +1681,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                isDark ? 'Tryb ciemny' : 'Tryb jasny',
+                isDark ? l10n.darkMode : l10n.lightMode,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,

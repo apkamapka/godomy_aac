@@ -249,5 +249,13 @@
   "recordingSaved": "✔ Recording saved",
   "playing": "▶️ Playing...",
   "recordingDeleted": "✔ Recording deleted",
-  "folderEmpty": "This folder is empty"
+  "folderEmpty": "This folder is empty",
+  "language": "Language",
+  "changeLanguage": "Change language",
+  "systemLanguage": "System language",
+  "darkMode": "Dark mode",
+  "lightMode": "Light mode",
+  "addDefaultCategoriesMenu": "Add default categories",
+  "addDefaultSymbolsMenu": "Add default symbols",
+  "loading": "Loading..."
 }

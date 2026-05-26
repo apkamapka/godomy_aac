@@ -249,5 +249,13 @@
   "recordingSaved": "✔ Nagranie zapisane",
   "playing": "▶️ Odtwarzanie...",
   "recordingDeleted": "✔ Nagranie usunięte",
-  "folderEmpty": "Ten folder jest pusty"
+  "folderEmpty": "Ten folder jest pusty",
+  "language": "Język",
+  "changeLanguage": "Zmień język",
+  "systemLanguage": "Język systemu",
+  "darkMode": "Tryb ciemny",
+  "lightMode": "Tryb jasny",
+  "addDefaultCategoriesMenu": "Dodaj domyślne kategorie",
+  "addDefaultSymbolsMenu": "Dodaj domyślne symbole",
+  "loading": "Ładowanie..."
 }
