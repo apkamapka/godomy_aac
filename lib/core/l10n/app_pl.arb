@@ -262,5 +262,22 @@
   "termsOfService": "Regulamin",
   "logout": "Wyloguj",
   "createdBy": "stworzone przez",
-  "linkOpenError": "Nie udało się otworzyć linku"
+  "linkOpenError": "Nie udało się otworzyć linku",
+  "exportProfile": "Eksportuj profil",
+  "importProfile": "Importuj profil",
+  "exporting": "Tworzenie kopii zapasowej...",
+  "importing": "Importowanie...",
+  "exportError": "Błąd eksportu",
+  "exportSaved": "Kopia zapasowa zapisana",
+  "importError": "Błąd importu",
+  "shareBackupText": "Kopia zapasowa profilu godoMyAAC",
+  "importSuccess": "Zaimportowano profil",
+  "importSummary": "Profil: {name}\nKategorie: {categories}, symbole: {symbols}",
+  "@importSummary": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "categories": {"type": "int"},
+      "symbols": {"type": "int"}
+    }
+  }
 }

@@ -262,5 +262,15 @@
   "termsOfService": "Terms of service",
   "logout": "Log out",
   "createdBy": "created by",
-  "linkOpenError": "Could not open the link"
+  "linkOpenError": "Could not open the link",
+  "exportProfile": "Export profile",
+  "importProfile": "Import profile",
+  "exporting": "Creating backup...",
+  "importing": "Importing...",
+  "exportError": "Export error",
+  "exportSaved": "Backup saved",
+  "importError": "Import error",
+  "shareBackupText": "godoMyAAC profile backup",
+  "importSuccess": "Profile imported",
+  "importSummary": "Profile: {name}\nCategories: {categories}, symbols: {symbols}"
 }

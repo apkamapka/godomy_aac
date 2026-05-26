@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_layout_grid/flutter_layout_grid.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/constants/app_links.dart';
 import '../../core/utils/url_helper.dart';
+import '../providers/backup_provider.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/category_symbol_model.dart';
 import '../../data/models/library_symbol_model.dart';
@@ -1417,6 +1419,144 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
 
   // ========== DRAWER ==========
 
+  Future<void> _handleExportProfile(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(l10n.exporting),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final service = await ref.read(backupServiceProvider.future);
+      final zipPath = await service.exportProfile(widget.profileId);
+      final bytes = await File(zipPath).readAsBytes();
+      final fileName = zipPath.split('/').last;
+
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      // Systemowe okno "Zapisz jako" - użytkownik wybiera folder (np. Pobrane).
+      final savedPath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.exportProfile,
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+        bytes: bytes,
+      );
+
+      if (savedPath != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.exportSaved),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('${l10n.exportError}: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleImportProfile(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Wybór pliku ZIP.
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+    if (picked == null || picked.files.single.path == null) return;
+    final zipPath = picked.files.single.path!;
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(l10n.importing),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final service = await ref.read(backupServiceProvider.future);
+      final result = await service.importProfile(zipPath);
+
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      // Odśwież listę profili.
+      ref.invalidate(profileRepositoryProvider);
+
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.importSuccess),
+            content: Text(l10n.importSummary(
+              result.profileName,
+              result.categories,
+              result.symbols,
+            )),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.go('/profiles');
+                },
+                child: Text(l10n.close),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('${l10n.importError}: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Widget _buildDrawer(BuildContext context, AppLocalizations l10n) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? Colors.grey[800] : Colors.white;
@@ -1579,6 +1719,30 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    _buildDrawerItem(
+                      icon: Icons.upload_file,
+                      label: l10n.exportProfile,
+                      color: const Color(0xFF26A69A),
+                      cardColor: cardColor,
+                      textColor: textColor,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _handleExportProfile(context);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDrawerItem(
+                      icon: Icons.download,
+                      label: l10n.importProfile,
+                      color: const Color(0xFF5C6BC0),
+                      cardColor: cardColor,
+                      textColor: textColor,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _handleImportProfile(context);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     Divider(color: isDark ? Colors.grey[700] : Colors.grey[300]),
                     const SizedBox(height: 12),
                     _buildDrawerItem(
@@ -1645,7 +1809,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
-                                decoration: TextDecoration.underline,
                               ),
                             ),
                           ),
@@ -1662,7 +1825,6 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
-                                decoration: TextDecoration.underline,
                               ),
                             ),
                           ),

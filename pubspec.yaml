@@ -42,6 +42,10 @@ dependencies:
   # Numer wersji aplikacji (czytany automatycznie z pubspec)
   package_info_plus: ^8.0.0
 
+  # Kopie zapasowe profili (pakowanie ZIP + udostępnianie pliku)
+  archive: ^3.6.1
+  share_plus: ^10.0.0
+
   # Images
   image_picker: ^1.0.7
   file_picker: ^8.0.0
