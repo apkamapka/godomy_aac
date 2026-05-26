@@ -257,5 +257,10 @@
   "lightMode": "Light mode",
   "addDefaultCategoriesMenu": "Add default categories",
   "addDefaultSymbolsMenu": "Add default symbols",
-  "loading": "Loading..."
+  "loading": "Loading...",
+  "privacyPolicy": "Privacy policy",
+  "termsOfService": "Terms of service",
+  "logout": "Log out",
+  "createdBy": "created by",
+  "linkOpenError": "Could not open the link"
 }

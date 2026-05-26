@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_layout_grid/flutter_layout_grid.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/l10n/app_localizations.dart';
+import '../../core/constants/app_links.dart';
+import '../../core/utils/url_helper.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/category_symbol_model.dart';
 import '../../data/models/library_symbol_model.dart';
@@ -43,11 +46,24 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
   bool _isLoading = true;
   bool _isMenuCollapsed = true;
   bool _deleteMode = false;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = info.version);
+      }
+    } catch (_) {
+      // Wersja niekrytyczna - w razie błędu zostaje pusta.
+    }
   }
 
   @override
@@ -137,13 +153,7 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-            actions: [
-              if (widget.categoryId == null)
-                IconButton(
-                  icon: const Icon(Icons.person, size: 28),
-                  onPressed: () => context.go('/profiles'),
-                ),
-            ],
+            actions: const [],
           ),
           drawer: widget.categoryId == null ? _buildDrawer(context, l10n) : null,
           body: SafeArea(
@@ -1568,16 +1578,98 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                         _showAddDefaultSymbolsDialog(context);
                       },
                     ),
+                    const SizedBox(height: 12),
+                    Divider(color: isDark ? Colors.grey[700] : Colors.grey[300]),
+                    const SizedBox(height: 12),
+                    _buildDrawerItem(
+                      icon: Icons.logout,
+                      label: l10n.logout,
+                      color: const Color(0xFFE53935),
+                      cardColor: cardColor,
+                      textColor: textColor,
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/profiles');
+                      },
+                    ),
                   ],
                 ),
               ),
 
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Wersja 1.0.0',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
+              // Stopka: wersja + autor (akApp) + linki prawne
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${l10n.appTitle}${_appVersion.isNotEmpty ? ' v$_appVersion' : ''}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.createdBy,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 4),
+                    // Logo akApp - klik otwiera stronę autora
+                    InkWell(
+                      onTap: () => openExternalUrl(context, AppLinks.website),
+                      borderRadius: BorderRadius.circular(24),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/akapp_logo.png',
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Linki prawne
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        InkWell(
+                          onTap: () =>
+                              openExternalUrl(context, AppLinks.terms),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            child: Text(
+                              l10n.termsOfService,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Text('·', style: TextStyle(color: Colors.grey[500])),
+                        InkWell(
+                          onTap: () => openExternalUrl(
+                              context, AppLinks.privacyPolicy),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            child: Text(
+                              l10n.privacyPolicy,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],

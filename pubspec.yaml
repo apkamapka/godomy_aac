@@ -36,6 +36,12 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^6.1.0
 
+  # Linki zewnętrzne (strona autora, polityka prywatności, regulamin)
+  url_launcher: ^6.2.5
+
+  # Numer wersji aplikacji (czytany automatycznie z pubspec)
+  package_info_plus: ^8.0.0
+
   # Images
   image_picker: ^1.0.7
   file_picker: ^8.0.0

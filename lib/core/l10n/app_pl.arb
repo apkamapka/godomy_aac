@@ -257,5 +257,10 @@
   "lightMode": "Tryb jasny",
   "addDefaultCategoriesMenu": "Dodaj domyślne kategorie",
   "addDefaultSymbolsMenu": "Dodaj domyślne symbole",
-  "loading": "Ładowanie..."
+  "loading": "Ładowanie...",
+  "privacyPolicy": "Polityka prywatności",
+  "termsOfService": "Regulamin",
+  "logout": "Wyloguj",
+  "createdBy": "stworzone przez",
+  "linkOpenError": "Nie udało się otworzyć linku"
 }

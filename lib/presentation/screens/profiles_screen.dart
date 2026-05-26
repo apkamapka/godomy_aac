@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/l10n/app_localizations.dart';
+import '../../core/constants/app_links.dart';
+import '../../core/utils/url_helper.dart';
 import '../providers/profiles_provider.dart';
 import '../../data/models/profile_model.dart';
 import '../../data/repositories/profile_repository.dart';
@@ -88,9 +90,10 @@ class ProfilesScreen extends ConsumerWidget {
         const Spacer(),
         // Przycisk
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: _buildCreateButton(context, l10n),
         ),
+        _buildCreatedByFooter(context, l10n),
       ],
     );
   }
@@ -127,9 +130,10 @@ class ProfilesScreen extends ConsumerWidget {
         ),
         // Przycisk
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: _buildCreateButton(context, l10n),
         ),
+        _buildCreatedByFooter(context, l10n),
       ],
     );
   }
@@ -251,6 +255,37 @@ class ProfilesScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCreatedByFooter(BuildContext context, AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            l10n.createdBy,
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () => openExternalUrl(context, AppLinks.website),
+            borderRadius: BorderRadius.circular(28),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/akapp_logo.png',
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
