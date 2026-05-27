@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:gif_view/gif_view.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class SymbolCard extends StatefulWidget {
   final String? emoji;
@@ -210,7 +209,7 @@ class _SymbolCardState extends State<SymbolCard> {
           return Center(
             child: Text(
               widget.emoji!,
-              style: GoogleFonts.notoColorEmoji(
+              style: TextStyle(
                 fontSize: size * 0.7,
                 height: 1.0,
               ),

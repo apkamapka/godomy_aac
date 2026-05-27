@@ -90,20 +90,31 @@ class CategoryCard extends StatelessWidget {
   Widget _buildIcon() {
     Widget iconWidget;
 
+    // 1. Własny obrazek — tylko jeśli plik faktycznie istnieje na dysku
     if (category.iconPath != null && category.iconPath!.isNotEmpty) {
       final file = File(category.iconPath!);
       if (file.existsSync()) {
-        iconWidget = Image.file(file, fit: BoxFit.contain);
-      } else {
-        iconWidget = Icon(Icons.category, size: 200, color: Color(category.iconColor));
+        return FittedBox(
+          fit: BoxFit.contain,
+          child: Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: Image.file(file, fit: BoxFit.contain),
+          ),
+        );
       }
+      // Plik znikł — spadamy dalej (emoji / iconName / default),
+      // NIE pokazujemy folderu jako fallback.
     }
-    else if (category.emoji != null && category.emoji!.isNotEmpty) {
+
+    // 2. Emoji
+    if (category.emoji != null && category.emoji!.isNotEmpty) {
       iconWidget = Text(category.emoji!, style: TextStyle(fontSize: 200));
     }
+    // 3. Material Icon po nazwie
     else if (category.iconName != null && category.iconName!.isNotEmpty) {
       iconWidget = Icon(_getIconData(category.iconName!), size: 200, color: Color(category.iconColor));
     }
+    // 4. Domyślny folder
     else {
       iconWidget = Icon(Icons.category, size: 200, color: Color(category.iconColor));
     }

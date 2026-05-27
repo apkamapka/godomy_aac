@@ -5,8 +5,8 @@ plugins {
 }
 
 android {
-    namespace = "com.example.godomy_aac"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "pl.akapp.godomyaac"
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,9 +19,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.godomy_aac"
+        applicationId = "pl.akapp.godomyaac"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

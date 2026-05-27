@@ -64,6 +64,7 @@ class _CategoryEditorScreenState extends ConsumerState<CategoryEditorScreen> {
           _existingCategory = category;
           _nameController.text = category.name;
           _iconPath = category.iconPath;
+          _emoji = category.emoji;
           _backgroundColor = Color(category.backgroundColor);
           _textColor = Color(category.textColor);
           _iconColor = Color(category.iconColor);
@@ -770,6 +771,7 @@ class _CategoryEditorScreenState extends ConsumerState<CategoryEditorScreen> {
         final updatedCategory = _existingCategory!.copyWith(
           name: _nameController.text.trim(),
           iconPath: _iconPath,
+          emoji: _emoji,
           backgroundColor: _backgroundColor.value,
           textColor: _textColor.value,
           iconColor: _iconColor.value,
@@ -794,6 +796,7 @@ class _CategoryEditorScreenState extends ConsumerState<CategoryEditorScreen> {
           id: _uuid.v4(),
           name: _nameController.text.trim(),
           iconPath: _iconPath,
+          emoji: _emoji,
           backgroundColor: _backgroundColor.value,
           textColor: _textColor.value,
           iconColor: _iconColor.value,

@@ -1,4 +1,4 @@
-package com.example.godomy_aac
+package pl.akapp.godomyaac
 
 import io.flutter.embedding.android.FlutterActivity
 

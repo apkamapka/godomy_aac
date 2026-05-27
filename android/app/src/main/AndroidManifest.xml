@@ -10,10 +10,6 @@
     <!-- Mikrofon (nagrywanie głosu) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- INTERNET: wymagany przez google_fonts (pobieranie czcionek).
-         Do usunięcia w Etapie 7, gdy czcionki będą zbundlowane lokalnie. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 

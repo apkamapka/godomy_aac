@@ -255,6 +255,8 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
                       fontWeight: FontWeight.bold,
                       color: textColor,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 10),
 
