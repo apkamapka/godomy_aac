@@ -6,8 +6,8 @@
   "library": "Library",
   "settings": "Settings",
   "history": "History",
-  "selectProfile": "Select Profile",
-  "addProfile": "Add Profile",
+  "selectProfile": "Choose profile",
+  "addProfile": "Add profile",
   "noProfiles": "No profiles",
   "addFirstProfile": "Add your first profile to get started",
   "profileSelected": "Profile selected: {name}",
@@ -92,10 +92,10 @@
   "createCategory": "Create category",
   "categoryCreated": "✓ Category created",
   "categoryUpdated": "✓ Category updated",
-  "iconRequired": "Select an icon for the category",
-  "nameRequired": "Enter a category name",
+  "iconRequired": "Choose a picture or emoji",
+  "nameRequired": "Enter a name",
   "nameTooShort": "Name must be at least 2 characters",
-  "nameTooLong": "Name can be at most 30 characters",
+  "nameTooLong": "The name can have up to 40 characters",
   "addSymbol": "Add symbol",
   "editSymbol": "Edit symbol",
   "deleteSymbol": "Delete symbol",
@@ -138,8 +138,8 @@
   "searchLibrary": "Search the library...",
   "noSymbolsInLibrary": "No symbols in the library",
   "addFirstSymbolToLibrary": "Add the first symbol to the library",
-  "symbolAddedToCategory": "✔ Symbol added to category",
-  "selectSymbolFirst": "Select a symbol first",
+  "symbolAddedToCategory": "✓ Picture added",
+  "selectSymbolFirst": "Choose a picture or emoji",
   "nameOverride": "Custom name (optional)",
   "nameOverrideHint": "Leave empty to use the library name",
   "imageOverride": "Custom image (optional)",
@@ -165,26 +165,36 @@
   "loadingError": "Loading error: {message}",
   "@loadingError": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "confirmDeleteCategoryWithContent": "Delete \"{name}\" along with all its content?",
   "@confirmDeleteCategoryWithContent": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "gridSet": "✔ Grid: {columns} × {rows}",
   "@gridSet": {
     "placeholders": {
-      "columns": { "type": "int" },
-      "rows": { "type": "int" }
+      "columns": {
+        "type": "int"
+      },
+      "rows": {
+        "type": "int"
+      }
     }
   },
   "columnsSet": "✓ Columns: {count}",
   "@columnsSet": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "noItemsToSort": "No items to sort",
@@ -197,19 +207,25 @@
   "pickImageError": "Error while selecting the image: {message}",
   "@pickImageError": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "savingError": "Error while saving: {message}",
   "@savingError": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "loadingProfileError": "Error loading profile: {message}",
   "@loadingProfileError": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "symbolNotFound": "Symbol not found",
@@ -220,7 +236,9 @@
   "playbackError": "Playback error: {message}",
   "@playbackError": {
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "confirmDeleteVoiceRecording": "Are you sure you want to delete the voice recording?",
@@ -232,7 +250,9 @@
   "addedItem": "✔ Added: \"{name}\"",
   "@addedItem": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "profileNotFound": "Profile not found",
@@ -243,7 +263,7 @@
   "basicSymbolsWillBeAdded": "Basic symbols will be added to all existing categories.",
   "save": "Save",
   "grid": "Grid",
-  "emojiInputHint": "Type or pick an emoji from the keyboard",
+  "emojiInputHint": "Or type your own from the keyboard:",
   "thisIsSystemSymbol": "This is a system symbol",
   "noRecording": "No recording",
   "recordingSaved": "✔ Recording saved",
@@ -272,5 +292,207 @@
   "importError": "Import error",
   "shareBackupText": "godoMyAAC profile backup",
   "importSuccess": "Profile imported",
-  "importSummary": "Profile: {name}\nCategories: {categories}, symbols: {symbols}"
+  "importSummary": "Profile: {name}\nCategories: {categories}, symbols: {symbols}",
+  "aboutDesc": "Free AAC app – no ads, works offline.",
+  "back": "Back",
+  "boardEmptyCaregiver": "Add the first pictures with the “Add” button below.",
+  "boardEmptyChild": "A caregiver can add pictures – the lock is in the top right corner.",
+  "boardEmptyTitle": "The board is empty",
+  "camera": "Camera",
+  "caregiverModeHint": "Caregiver mode – the pencil opens editing",
+  "caregiverModeOn": "Caregiver mode",
+  "caregiverModeTitle": "Caregiver mode",
+  "changeOrder": "Change order",
+  "choose": "Choose",
+  "colorByWordKind": "Colour by word type (Fitzgerald key)",
+  "createProfileAndStart": "Create and start",
+  "defaultColor": "Default colour",
+  "deleteLastHint": "Delete last word (hold to clear)",
+  "deleteModeHint": "Tap a tile to delete it",
+  "deleteModeOn": "Deleting",
+  "deleteProfileContentWarning": "All of its boards will be deleted too. This cannot be undone.",
+  "done": "Done",
+  "editCoreWords": "Edit words",
+  "editProfileDesc": "Name and photo",
+  "exportProfileDesc": "Save a copy of the boards to a ZIP file",
+  "frequent": "Frequent",
+  "frequentEmpty": "The most used words will appear here.",
+  "frequentReset": "Clear statistics",
+  "frequentResetConfirm": "The “Frequent” list will start over.",
+  "gallery": "Gallery",
+  "gridHint": "How many tiles fit on one screen",
+  "haptics": "Vibrate on tap",
+  "hapticsDesc": "A short vibration confirms a tap",
+  "importProfileDesc": "Load a profile from a ZIP file (as a new profile)",
+  "importProfileFromFile": "Import profile from file",
+  "kindFolder": "Folder",
+  "kindSymbol": "Picture",
+  "libraryDeleteUsed": "“{name}” is used on boards ({count}). Delete it everywhere?",
+  "@libraryDeleteUsed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "licenses": "Licences",
+  "lockExplain": "The lock protects the board from accidental changes. Choose how to open it:",
+  "lockHold": "Hold the lock",
+  "lockHoldDesc": "Hold the lock for 3 seconds",
+  "lockHoldHint": "Hold the lock for 3 seconds to unlock",
+  "lockMath": "Grown-up puzzle",
+  "lockMathDesc": "Solve a sum, e.g. 14 × 6",
+  "lockPin": "PIN code",
+  "lockPinDesc": "4 digits. A forgotten PIN can be bypassed with a puzzle.",
+  "lockTooltipLock": "Lock (leave caregiver mode)",
+  "lockTooltipUnlock": "Unlock caregiver mode",
+  "mathChallengeHint": "Solve the sum to edit the board.",
+  "mathChallengeWrong": "Not quite. Try a new one.",
+  "menu": "Menu",
+  "micPermissionNeeded": "Microphone access is needed.",
+  "modeDirect": "Speak right away",
+  "modeDirectDesc": "A tap speaks the word right away, without adding it to the sentence",
+  "modeSentence": "Add to sentence",
+  "modeSentenceDesc": "The word goes to the sentence bar (and is spoken if enabled)",
+  "moreColors": "More colours",
+  "newProfile": "New profile",
+  "noDefaultColor": "No default colour",
+  "noResults": "No results – try another word.",
+  "order": "Order",
+  "picture": "Picture",
+  "pinChange": "Change PIN",
+  "pinEnter": "Enter PIN",
+  "pinForgot": "Forgot PIN",
+  "pinMismatch": "PINs don’t match – try again",
+  "pinRepeat": "Repeat PIN",
+  "pinResetHint": "Unlocked. You can set a new PIN in Settings.",
+  "pinSaved": "✓ PIN saved",
+  "pinSetNew": "Set a 4-digit PIN",
+  "pinWrong": "Wrong PIN",
+  "preparingBoard": "Preparing the board…",
+  "profileName": "Name",
+  "profileNameHint": "e.g. Anna, Jake",
+  "profileNameRequired": "Enter a name",
+  "profilePhotoHint": "The photo will also appear on the “me” tile.",
+  "profileUpdated": "✓ Profile saved",
+  "recordAgain": "Record again",
+  "recordingReady": "Recording ready",
+  "reorderHint": "Drag by the handle to move",
+  "saveAsTile": "Save",
+  "saveSentenceTitle": "Save sentence as a tile",
+  "saveSentenceWhere": "The tile will appear in: {folder}",
+  "@saveSentenceWhere": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "schedule": "Daily schedule",
+  "scheduleAllDone": "All done!",
+  "scheduleAllDoneSpeech": "Well done! All done.",
+  "scheduleDone": "Done",
+  "scheduleEdit": "Edit schedule",
+  "scheduleEmptyCaregiver": "The schedule is empty. Tap the pencil to add steps.",
+  "scheduleEmptyChild": "The schedule is empty.",
+  "scheduleNow": "Now",
+  "scheduleRestart": "Start over",
+  "scheduleThen": "Next",
+  "sentenceHint": "Tap pictures to build a sentence",
+  "sentenceSaved": "✓ Tile “{name}” added",
+  "@sentenceSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBoard": "Board",
+  "settingsCaregiver": "Caregiver mode",
+  "settingsData": "Data and backup",
+  "settingsDevice": "This device",
+  "settingsSpeech": "Speech",
+  "showCoreWords": "Core words",
+  "showCoreWordsDesc": "A fixed row of the most important words on the start board",
+  "showSentenceBar": "Sentence bar",
+  "showSentenceBarDesc": "Build sentences from several pictures",
+  "sourceFiles": "Phone",
+  "sourceLibrary": "Library",
+  "speak": "Speak",
+  "speakOnTap": "Speak on tap",
+  "speakOnTapDesc": "Every tapped picture speaks right away",
+  "speechPitch": "Voice pitch",
+  "speechRate": "Speech rate",
+  "speechRateValue": "{percent}%",
+  "@speechRateValue": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "startBoard": "Start board",
+  "starterBoard": "Ready-made start board",
+  "starterBoardAdd": "Add ready-made board",
+  "starterBoardAddConfirm": "Missing folders from the ready-made board will be added. Existing tiles stay as they are.",
+  "starterBoardAddDesc": "Folders with pictures: needs, feelings, chat…",
+  "starterBoardAdded": "✓ Added folders: {categories}, pictures: {symbols}",
+  "@starterBoardAdded": {
+    "placeholders": {
+      "categories": {
+        "type": "int"
+      },
+      "symbols": {
+        "type": "int"
+      }
+    }
+  },
+  "starterBoardDesc": "Picture folders, core words, Urgent and a daily schedule – ready right away",
+  "starterBoardNothing": "All ready-made folders are already there.",
+  "stop": "Stop",
+  "switchProfile": "Switch profile",
+  "symbolNameHelper": "This word will be spoken",
+  "tapBehavior": "When a picture in this folder is tapped",
+  "tapToRecord": "Tap the microphone to record",
+  "theme": "Appearance",
+  "themeSystem": "System",
+  "tileName": "Tile name (this will be spoken)",
+  "unlock": "Unlock",
+  "urgent": "Urgent",
+  "urgentEmpty": "No tiles. In caregiver mode tap “Edit”.",
+  "urgentHint": "Tap – I’ll say it right away.",
+  "voice": "Voice",
+  "voiceCount": "Polish voices available: {count}",
+  "@voiceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "voiceDefault": "Default",
+  "voiceNone": "No Polish voices – install them in the phone’s text-to-speech settings",
+  "voiceOnline": "needs internet",
+  "voiceRecordingHint": "Record the word in your own voice – it will play instead of speech synthesis.",
+  "voiceTest": "Listen",
+  "welcomeCta": "Create a profile",
+  "welcomeImport": "I have a backup – continue",
+  "welcomePoint1": "The child taps a picture and the phone says the word.",
+  "welcomePoint1Title": "Talk with pictures",
+  "welcomePoint2": "Pictures build a sentence. The big “Speak” button reads it aloud.",
+  "welcomePoint2Title": "Build sentences",
+  "welcomePoint3": "Editing is behind a lock – nothing gets deleted by accident.",
+  "welcomePoint3Title": "Caregiver mode",
+  "welcomePoint4": "Everything stays on this device. No account, no ads, no internet.",
+  "welcomePoint4Title": "Private and offline",
+  "welcomeSubtitle": "A free communication board for children and adults who don’t speak.",
+  "welcomeTitle": "Hi! This is godoMyAAC",
+  "whatToAdd": "What do you want to add?",
+  "whoIsTalking": "Who’s talking today?",
+  "whoIsTalkingHint": "Choose a profile or add a new one",
+  "themeLight": "Light",
+  "themeDark": "Dark"
 }

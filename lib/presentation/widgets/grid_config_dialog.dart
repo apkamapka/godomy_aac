@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/app_localizations.dart';
+import '../../core/theme/app_colors.dart';
+
+/// Wybór liczby kolumn i wierszy siatki (z podglądem).
 class GridConfigDialog extends StatefulWidget {
   final int initialColumns;
   final int initialRows;
@@ -9,7 +13,7 @@ class GridConfigDialog extends StatefulWidget {
     super.key,
     required this.initialColumns,
     required this.initialRows,
-    this.title = 'Siatka symboli',
+    this.title = 'Siatka',
   });
 
   @override
@@ -23,223 +27,186 @@ class _GridConfigDialogState extends State<GridConfigDialog> {
   @override
   void initState() {
     super.initState();
-    _columns = widget.initialColumns;
-    _rows = widget.initialRows;
+    _columns = widget.initialColumns.clamp(1, 6);
+    _rows = widget.initialRows.clamp(1, 8);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final palette = context.aac;
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Tytuł z ikoną
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF42A5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.grid_view, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  widget.title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Podgląd siatki
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[300]!),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                l10n.gridHint,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w600),
               ),
-              child: Padding(
+              const SizedBox(height: 18),
+              Container(
+                width: 150,
+                height: 150,
                 padding: const EdgeInsets.all(8),
-                child: _buildGridPreview(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '$_columns × $_rows',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Kolumny
-            _buildCounter(
-              label: 'Kolumny',
-              value: _columns,
-              color: const Color(0xFF66BB6A),
-              onDecrement: _columns > 1 ? () => setState(() => _columns--) : null,
-              onIncrement: _columns < 6 ? () => setState(() => _columns++) : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Wiersze
-            _buildCounter(
-              label: 'Wiersze',
-              value: _rows,
-              color: const Color(0xFFFFB74D),
-              onDecrement: _rows > 1 ? () => setState(() => _rows--) : null,
-              onIncrement: _rows < 8 ? () => setState(() => _rows++) : null,
-            ),
-            const SizedBox(height: 24),
-
-            // Przyciski
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Anuluj'),
-                  ),
+                decoration: BoxDecoration(
+                  color: palette.paper,
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, (_columns, _rows)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF42A5F5),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: _GridPreview(columns: _columns, rows: _rows),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$_columns × $_rows',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 18),
+              _Counter(
+                label: l10n.gridColumns,
+                value: _columns,
+                color: AppColors.leaf,
+                onDecrement: _columns > 1 ? () => setState(() => _columns--) : null,
+                onIncrement: _columns < 6 ? () => setState(() => _columns++) : null,
+              ),
+              const SizedBox(height: 12),
+              _Counter(
+                label: l10n.gridRows,
+                value: _rows,
+                color: AppColors.sunDeep,
+                onDecrement: _rows > 1 ? () => setState(() => _rows--) : null,
+                onIncrement: _rows < 8 ? () => setState(() => _rows++) : null,
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(l10n.cancel),
                     ),
-                    child: const Text('Zapisz'),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, (_columns, _rows)),
+                      child: Text(l10n.save),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildGridPreview() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cellWidth = (constraints.maxWidth - (_columns - 1) * 4) / _columns;
-        final cellHeight = (constraints.maxHeight - (_rows - 1) * 4) / _rows;
+class _GridPreview extends StatelessWidget {
+  final int columns;
+  final int rows;
+  const _GridPreview({required this.columns, required this.rows});
 
-        return Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: List.generate(_columns * _rows, (index) {
-            return Container(
-              width: cellWidth,
-              height: cellHeight,
-              decoration: BoxDecoration(
-                color: const Color(0xFF42A5F5).withOpacity(0.3),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFF42A5F5), width: 1),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-
-  Widget _buildCounter({
-    required String label,
-    required int value,
-    required Color color,
-    VoidCallback? onDecrement,
-    VoidCallback? onIncrement,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
-            ),
-          ),
-          const Spacer(),
-          // Minus button
-          GestureDetector(
-            onTap: onDecrement,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: onDecrement != null ? color : Colors.grey[300],
-                shape: BoxShape.circle,
-                boxShadow: onDecrement != null
-                    ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))]
-                    : null,
-              ),
-              child: Icon(
-                Icons.remove,
-                color: onDecrement != null ? Colors.white : Colors.grey[500],
-                size: 24,
-              ),
-            ),
-          ),
-          // Value
-          SizedBox(
-            width: 50,
-            child: Text(
-              '$value',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ),
-          // Plus button
-          GestureDetector(
-            onTap: onIncrement,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: onIncrement != null ? color : Colors.grey[300],
-                shape: BoxShape.circle,
-                boxShadow: onIncrement != null
-                    ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))]
-                    : null,
-              ),
-              child: Icon(
-                Icons.add,
-                color: onIncrement != null ? Colors.white : Colors.grey[500],
-                size: 24,
-              ),
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var r = 0; r < rows; r++) ...[
+          if (r > 0) const SizedBox(height: 4),
+          Expanded(
+            child: Row(
+              children: [
+                for (var c = 0; c < columns; c++) ...[
+                  if (c > 0) const SizedBox(width: 4),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.sky.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: AppColors.sky, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _Counter extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+
+  const _Counter({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.onDecrement,
+    this.onIncrement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          _RoundButton(icon: Icons.remove_rounded, color: color, onTap: onDecrement),
+          SizedBox(
+            width: 48,
+            child: Text(
+              '$value',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color),
+            ),
+          ),
+          _RoundButton(icon: Icons.add_rounded, color: color, onTap: onIncrement),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+  const _RoundButton({required this.icon, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Material(
+      color: enabled ? color : context.aac.line,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: Colors.white),
+        ),
       ),
     );
   }

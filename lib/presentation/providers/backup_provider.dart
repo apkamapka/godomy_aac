@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/services/app_settings.dart';
 import '../../data/services/backup_service.dart';
 import '../../data/repositories/profile_repository.dart';
 import '../../data/repositories/category_repository.dart';
@@ -23,5 +24,6 @@ final backupServiceProvider = FutureProvider<BackupService>((ref) async {
     categoryRepo: categoryRepo,
     categorySymbolRepo: categorySymbolRepo,
     librarySymbolRepo: librarySymbolRepo,
+    prefs: ref.read(appPrefsProvider),
   );
 });

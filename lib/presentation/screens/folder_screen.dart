@@ -1,33 +1,37 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_layout_grid/flutter_layout_grid.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:file_picker/file_picker.dart';
+
+import '../../core/constants/system_ids.dart';
 import '../../core/l10n/app_localizations.dart';
-import '../../core/constants/app_links.dart';
-import '../../core/utils/url_helper.dart';
-import '../providers/backup_provider.dart';
+import '../../core/theme/app_colors.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/category_symbol_model.dart';
-import '../../data/models/library_symbol_model.dart';
 import '../../data/models/profile_model.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/category_symbol_repository.dart';
-import '../../data/repositories/library_symbol_repository.dart';
-import '../../data/repositories/profile_repository.dart';
-import '../../data/services/default_categories_service.dart';
-import '../../data/services/default_symbols_service.dart';
+import '../../data/services/app_settings.dart';
+import '../../data/services/default_content_service.dart';
 import '../../data/services/tts_service.dart';
-import '../../data/services/audio_player_service.dart';
-import '../providers/folder_content_provider.dart';
-import '../providers/theme_provider.dart';
-import '../providers/message_provider.dart';
+import '../providers/board_provider.dart';
+import '../providers/caregiver_provider.dart';
 import '../providers/symbols_grid_config_provider.dart';
-import '../widgets/message_container.dart';
+import '../widgets/aac_tile.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/app_sheet.dart';
+import '../widgets/board_grid.dart';
+import '../widgets/caregiver_lock.dart';
+import '../widgets/edit_toolbar.dart';
 import '../widgets/grid_config_dialog.dart';
+import '../widgets/reorder_sheet.dart';
+import '../widgets/save_sentence_sheet.dart';
+import '../widgets/sentence_bar.dart';
+import '../widgets/symbol_image.dart';
+import '../widgets/tile_actions.dart';
+import '../widgets/urgent_sheet.dart';
 
+/// Tablica komunikacyjna: tablica startowa (categoryId == null) albo folder.
 class FolderScreen extends ConsumerStatefulWidget {
   final String profileId;
   final String? categoryId;
@@ -43,2312 +47,712 @@ class FolderScreen extends ConsumerStatefulWidget {
 }
 
 class _FolderScreenState extends ConsumerState<FolderScreen> {
-  ProfileModel? _profile;
-  CategoryModel? _currentCategory;
-  bool _isLoading = true;
-  bool _isMenuCollapsed = true;
-  bool _deleteMode = false;
-  String _appVersion = '';
+  final _flyTarget = GlobalKey();
+
+  bool get _isRoot => widget.categoryId == null;
+  BoardKey get _boardKey => (profileId: widget.profileId, categoryId: widget.categoryId);
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-    _loadAppVersion();
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      if (mounted) {
-        setState(() => _appVersion = info.version);
-      }
-    } catch (_) {
-      // Wersja niekrytyczna - w razie błędu zostaje pusta.
-    }
-  }
-
-  @override
-  void didUpdateWidget(FolderScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.categoryId != widget.categoryId) {
-      _loadData();
-    }
-  }
-
-  Future<void> _loadData() async {
-    try {
-      final profileRepo = await ref.read(profileRepositoryProvider.future);
-      final profile = await profileRepo.getById(widget.profileId);
-
-      CategoryModel? category;
-      if (widget.categoryId != null) {
-        final categoryRepo = await ref.read(categoryRepositoryProvider.future);
-        category = await categoryRepo.getById(widget.categoryId!);
-      }
-
-      if (profile != null) {
-        if (mounted) {
-          setState(() {
-            _profile = profile;
-            _currentCategory = category;
-            _isLoading = false;
-          });
+    // Głos z ustawień profilu (i po każdej zmianie profilu).
+    ref.listenManual<AsyncValue<ProfileModel?>>(
+      profileProvider(widget.profileId),
+      (previous, next) {
+        final profile = next.valueOrNull;
+        if (profile != null) {
+          ref.read(ttsServiceProvider).applySettings(
+                voiceName: profile.ttsVoiceId,
+                voiceLocale: profile.ttsLanguage,
+                rate: profile.ttsRate,
+                pitch: profile.ttsPitch,
+              );
         }
+      },
+      fireImmediately: true,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onOpen());
+  }
+
+  Future<void> _onOpen() async {
+    if (!mounted) return;
+    await ref.read(appSettingsProvider.notifier).setLastProfile(widget.profileId);
+    if (_isRoot) {
+      try {
+        final service = await ref.read(defaultContentServiceProvider.future);
+        await service.ensureSystemBoards(widget.profileId);
+      } catch (_) {}
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Akcje na kafelkach
+  // ---------------------------------------------------------------------------
+
+  void _onTileTap(
+    BoardItem item,
+    Rect rect, {
+    required CommunicationMode mode,
+    required ProfileSettings settings,
+    required bool deleteMode,
+  }) {
+    if (deleteMode) {
+      _deleteItem(item);
+      return;
+    }
+    if (item.isFolder) {
+      if (ref.read(appSettingsProvider).haptics) HapticFeedback.selectionClick();
+      context.push('/folder/${widget.profileId}/c/${item.id}');
+      return;
+    }
+    handleSymbolTap(
+      context: context,
+      ref: ref,
+      profileId: widget.profileId,
+      item: item,
+      rect: rect,
+      direct: mode == CommunicationMode.direct,
+      settings: settings,
+      flyTarget: _flyTarget,
+      profile: ref.read(profileProvider(widget.profileId)).valueOrNull,
+    );
+  }
+
+  void _editItem(BoardItem item) {
+    if (item.isFolder) {
+      context.push('/folder/${widget.profileId}/category-editor?categoryId=${item.id}');
+    } else {
+      context.push('/folder/${widget.profileId}/edit-symbol/${item.id}');
+    }
+  }
+
+  Future<void> _deleteItem(BoardItem item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showConfirmDialog(
+      context,
+      title: item.isFolder ? l10n.deleteCategory : l10n.deleteSymbol,
+      message: item.isFolder
+          ? l10n.confirmDeleteCategoryWithContent(item.name)
+          : l10n.confirmDeleteSymbol(item.name),
+      confirmLabel: l10n.delete,
+      cancelLabel: l10n.cancel,
+      destructive: true,
+      icon: Icons.delete_rounded,
+    );
+    if (!ok) return;
+    try {
+      if (item.isFolder) {
+        final repo = await ref.read(categoryRepositoryProvider.future);
+        await repo.deleteWithChildren(item.id);
       } else {
-        if (mounted) {
-          context.go('/profiles');
-        }
+        final repo = await ref.read(categorySymbolRepositoryProvider.future);
+        await repo.delete(item.id);
       }
+      if (mounted) showToast(context, item.isFolder ? l10n.categoryDeleted : l10n.symbolDeleted);
     } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.loadingError(e.toString()))),
-        );
-        context.go('/profiles');
-      }
+      if (mounted) showToast(context, l10n.error(e.toString()), error: true);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Pasek narzędzi opiekuna
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showAddSheet({required bool allowFolders}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final cid = widget.categoryId;
+    final choice = await showAppSheet<String>(
+      context: context,
+      title: l10n.whatToAdd,
+      builder: (sheetContext) => Row(
+        children: [
+          Expanded(
+            child: BigActionButton(
+              icon: Icons.add_photo_alternate_rounded,
+              label: l10n.addSymbol,
+              color: AppColors.leaf,
+              filled: true,
+              height: 110,
+              onTap: () => Navigator.pop(sheetContext, 'symbol'),
+            ),
+          ),
+          if (allowFolders) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: BigActionButton(
+                icon: Icons.create_new_folder_rounded,
+                label: l10n.addCategory,
+                color: AppColors.sky,
+                filled: true,
+                height: 110,
+                onTap: () => Navigator.pop(sheetContext, 'folder'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'symbol') {
+      context.push('/folder/${widget.profileId}/add-symbol${cid != null ? '?categoryId=$cid' : ''}');
+    } else {
+      context.push('/folder/${widget.profileId}/category-editor${cid != null ? '?parentId=$cid' : ''}');
+    }
+  }
+
+  Future<void> _reorder(List<BoardItem> items) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (items.isEmpty) {
+      showToast(context, l10n.noItemsToSort);
+      return;
+    }
+    final result = await showReorderSheet(context, items);
+    if (result == null) return;
+    try {
+      final now = DateTime.now();
+      final categories = <CategoryModel>[];
+      final symbols = <CategorySymbolModel>[];
+      for (var i = 0; i < result.length; i++) {
+        final item = result[i];
+        if (item.category != null) {
+          categories.add(item.category!.copyWith(position: i, updatedAt: now));
+        } else if (item.symbol != null) {
+          symbols.add(item.symbol!.copyWith(position: i, updatedAt: now));
+        }
+      }
+      final catRepo = await ref.read(categoryRepositoryProvider.future);
+      final symRepo = await ref.read(categorySymbolRepositoryProvider.future);
+      if (categories.isNotEmpty) await catRepo.updateMany(categories);
+      if (symbols.isNotEmpty) await symRepo.updateMany(symbols);
+      if (mounted) showToast(context, l10n.orderSaved);
+    } catch (e) {
+      if (mounted) showToast(context, l10n.error(e.toString()), error: true);
+    }
+  }
+
+  Future<void> _configureGrid(int columns, int rows) async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await showDialog<(int, int)>(
+      context: context,
+      builder: (_) => GridConfigDialog(
+        initialColumns: columns,
+        initialRows: rows,
+        title: l10n.grid,
+      ),
+    );
+    if (result == null) return;
+    final (c, r) = result;
+    await ref.read(symbolsGridConfigsProvider.notifier).setConfig(
+          _gridKey,
+          SymbolsGridConfig(columns: c, rows: r),
+        );
+    if (mounted) showToast(context, l10n.gridSet(c, r));
+  }
+
+  String get _gridKey => widget.categoryId ?? 'root_${widget.profileId}';
+
+  // ---------------------------------------------------------------------------
+  // Budowanie
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final profileAsync = ref.watch(profileProvider(widget.profileId));
+    final profile = profileAsync.valueOrNull;
 
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    if (profileAsync.hasValue && profile == null) {
+      return _MissingScreen(
+        message: l10n.profileNotFound,
+        onTap: () => context.go('/profiles'),
       );
     }
 
-    if (_profile == null) {
-      return Scaffold(
-        body: Center(child: Text(l10n.profileNotFound)),
-      );
-    }
+    final caregiver = ref.watch(caregiverModeProvider);
+    final deleteMode = ref.watch(deleteModeProvider);
+    final settings = ref.watch(profileSettingsProvider(widget.profileId));
+    final category = _isRoot ? null : ref.watch(categoryByIdProvider(widget.categoryId!)).valueOrNull;
+    final isSystemBoard = category != null && SystemIds.isSystemParent(category.parentId);
+    final itemsAsync = ref.watch(boardItemsProvider(_boardKey));
+    final items = itemsAsync.valueOrNull ?? const <BoardItem>[];
 
-    final contentAsync = ref.watch(folderContentProvider(widget.profileId, widget.categoryId));
-    final keyboardVisible = ref.watch(messageContainerVisibleProvider);
-
-    // Określ kolor tła chmurki
-    final headerColor = _currentCategory != null
-        ? Color(_currentCategory!.backgroundColor)
-        : const Color(0xFF42A5F5);
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: isDark ? null : const Color(0xFFE3F2FD),
-          appBar: AppBar(
-            toolbarHeight: 46,
-            title: const SizedBox.shrink(),
-            leading: widget.categoryId != null
-                ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
-            )
-                : Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu, size: 28),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            actions: const [],
-          ),
-          drawer: widget.categoryId == null ? _buildDrawer(context, l10n) : null,
-          body: SafeArea(
-            bottom: true,
-            child: Column(
-              children: [
-                // Breadcrumbs NAD chmurką
-                if (widget.categoryId != null) _buildBreadcrumbs(context),
-
-                // Cloud Header
-                _buildCloudHeader(context, l10n, headerColor, keyboardVisible),
-
-                // Content Grid
-                Expanded(
-                  child: contentAsync.when(
-                    data: (content) {
-                      if (content.isEmpty) {
-                        return _buildEmptyState(context, l10n);
-                      }
-                      return _buildGrid(context, content, keyboardVisible);
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) => Center(
-                      child: Text(l10n.error(error.toString())),
-                    ),
-                  ),
-                ),
-
-                // Message Container (klawiatura)
-                const MessageContainer(),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ========== CLOUD HEADER ==========
-
-  Widget _buildCloudHeader(
-      BuildContext context,
-      AppLocalizations l10n,
-      Color backgroundColor,
-      bool keyboardVisible,
-      ) {
-    final hsl = HSLColor.fromColor(backgroundColor);
-    final cloudColor = hsl.withLightness((hsl.lightness + 0.85) / 2).toColor();
-    final textColor = hsl.withLightness(0.25).withSaturation(0.8).toColor();
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Chmurka z przyciskami
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          height: _isMenuCollapsed ? 0 : 140,
-          clipBehavior: Clip.hardEdge,
-          decoration: const BoxDecoration(), // wymagane dla clipBehavior
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 200),
-            opacity: _isMenuCollapsed ? 0 : 1,
-            child: _isMenuCollapsed
-                ? const SizedBox.shrink()
-                : Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: cloudColor,
-                borderRadius: BorderRadius.circular(35),
-                boxShadow: [
-                  BoxShadow(
-                    color: backgroundColor.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-                border: Border.all(
-                  color: backgroundColor.withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Tytuł
-                  Text(
-                    _currentCategory?.name ?? _profile!.name,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Przyciski
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Dodaj
-                      _buildCircleButton(
-                        imagePath: 'assets/ui_icons/klawiszdodaj.png',
-                        onTap: () => _showAddDialog(context, l10n),
-                        size: 39,
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Usuń (toggle)
-                      _buildCircleButton(
-                        imagePath: 'assets/ui_icons/klawiszusun.png',
-                        onTap: () => setState(() => _deleteMode = !_deleteMode),
-                        size: 39,
-                        isActive: _deleteMode,
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Siatka
-                      _buildCircleButton(
-                        imagePath: 'assets/ui_icons/klawiszsiatka.png',
-                        onTap: () => _showGridConfigDialog(context),
-                        size: 39,
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Klawiatura
-                      _buildCircleButton(
-                        imagePath: 'assets/ui_icons/klawiszklawiatura.png',
-                        onTap: () => ref.read(messageContainerVisibleProvider.notifier).toggle(),
-                        size: 39,
-                        isActive: keyboardVisible,
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Kolejność
-                      _buildCircleButton(
-                        imagePath: 'assets/ui_icons/klawiszkolejnosc.png',
-                        onTap: () => _showReorderSheet(context),
-                        size: 39,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // Strzałka zwijania
-        GestureDetector(
-          onTap: () => setState(() => _isMenuCollapsed = !_isMenuCollapsed),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 1),
-            child: Image.asset(
-              _isMenuCollapsed
-                  ? 'assets/ui_icons/klawiszdol.png'
-                  : 'assets/ui_icons/klawiszgora.png',
-              width: 32,
-              height: 32,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCircleButton({
-    required String imagePath,
-    required VoidCallback onTap,
-    required double size,
-    bool isActive = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: isActive ? Border.all(color: Colors.white, width: 3) : null,
-        ),
-        child: ClipOval(
-          child: Image.asset(imagePath, fit: BoxFit.cover),
-        ),
-      ),
-    );
-  }
-
-  // ========== BREADCRUMBS ==========
-
-  Widget _buildBreadcrumbs(BuildContext context) {
-    final breadcrumbsAsync = ref.watch(categoryBreadcrumbsProvider(widget.categoryId));
-
-    return breadcrumbsAsync.when(
-      data: (breadcrumbs) {
-        if (breadcrumbs.isEmpty) return const SizedBox.shrink();
-
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: isDark ? Colors.grey[800] : const Color(0xFFE3F2FD),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    // Wróć do root
-                    while (context.canPop()) {
-                      context.pop();
-                    }
-                  },
-                  child: const Icon(Icons.home, size: 20, color: Colors.blue),
-                ),
-                ...breadcrumbs.map((category) {
-                  final isLast = category == breadcrumbs.last;
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-                      ),
-                      GestureDetector(
-                        onTap: isLast ? null : () => context.pop(),
-                        child: Text(
-                          category.name,
-                          style: TextStyle(
-                            color: isLast
-                                ? (isDark ? Colors.white : Colors.black87)
-                                : Colors.blue,
-                            fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  // ========== GRID ==========
-
-  Widget _buildGrid(BuildContext context, FolderContent content, bool keyboardVisible) {
-    // Pobierz konfigurację siatki
     final gridConfigs = ref.watch(symbolsGridConfigsProvider);
-    final defaultConfig = _currentCategory?.gridConfig ?? GridConfig(columns: 3, rows: 3);
-    final categoryId = widget.categoryId ?? 'root_${widget.profileId}';
+    final defaultGrid = category?.gridConfig;
+    final saved = gridConfigs[_gridKey];
+    final columns = saved?.columns ?? defaultGrid?.columns ?? 3;
+    final rows = saved?.rows ?? defaultGrid?.rows ?? 3;
+    // Tablice systemowe (słowa kluczowe, Pilne, Plan dnia) otwierane do edycji
+    // nie mają paska zdania – dotknięcie tylko mówi.
+    final mode = isSystemBoard
+        ? CommunicationMode.direct
+        : (category?.communicationMode ?? CommunicationMode.text);
 
-    final gridConfig = gridConfigs[categoryId] ?? SymbolsGridConfig(
-      columns: defaultConfig.columns,
-      rows: defaultConfig.rows,
-    );
+    final screen = MediaQuery.sizeOf(context);
+    final landscape = BoardGridLayout.isLandscape(screen);
+    final compact = screen.height < 560;
+    final showSentence = settings.showSentenceBar && !isSystemBoard;
 
-    final columns = gridConfig.columns;
-    final rows = gridConfig.rows;
-    final totalCells = columns * rows;
-
-    // Połącz kategorie i symbole i posortuj po pozycji
-    final items = <dynamic>[...content.categories, ...content.symbols];
-
-    print('📊 === PRZED SORTOWANIEM ===');
-    for (var item in items) {
-      if (item is CategoryModel) {
-        print('📁 ${item.name}: position=${item.position}');
-      } else if (item is CategorySymbolModel) {
-        print('🖼️ ${item.nameOverride ?? item.id}: position=${item.position}');
-      }
-    }
-
-    items.sort((a, b) {
-      final posA = a is CategoryModel ? a.position : (a as CategorySymbolModel).position;
-      final posB = b is CategoryModel ? b.position : (b as CategorySymbolModel).position;
-      return posA.compareTo(posB);
-    });
-
-    print('📊 === PO SORTOWANIU ===');
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      if (item is CategoryModel) {
-        print('[$i] 📁 ${item.name}: position=${item.position}');
-      } else if (item is CategorySymbolModel) {
-        print('[$i] 🖼️ ${item.nameOverride ?? item.id}: position=${item.position}');
-      }
-    }
-
-    // Sprawdź czy scroll jest zablokowany (dla kategorii)
-    final scrollLocked = _currentCategory?.scrollLocked ?? false;
-    final displayItems = scrollLocked ? items.take(totalCells).toList() : items;
-
-    // Buduj komórki
-    final allCells = <Widget>[];
-
-    if (scrollLocked) {
-      // Tryb bez scrolla - wypełnij pustymi komórkami
-      for (int i = 0; i < totalCells; i++) {
-        if (i < displayItems.length) {
-          allCells.add(_buildItemCard(context, displayItems[i]));
-        } else {
-          allCells.add(_buildEmptyCell());
-        }
-      }
-
-      return Padding(
-        padding: EdgeInsets.only(
-          left: 4,
-          right: 4,
-          top: 4,
-          bottom: keyboardVisible ? 200 : 4,
-        ),
-        child: LayoutGrid(
-          columnSizes: List.filled(columns, 1.fr),
-          rowSizes: List.filled(rows, 1.fr),
-          columnGap: 4,
-          rowGap: 4,
-          children: allCells,
-        ),
-      );
-    } else {
-      // Tryb ze scrollem
-      final totalRows = (displayItems.length / columns).ceil();
-      final totalCellsWithScroll = totalRows * columns;
-
-      for (int i = 0; i < totalCellsWithScroll; i++) {
-        if (i < displayItems.length) {
-          allCells.add(_buildItemCard(context, displayItems[i]));
-        } else {
-          allCells.add(_buildEmptyCell());
-        }
-      }
-
-      final screenHeight = MediaQuery.of(context).size.height;
-      final availableHeight = screenHeight -
-          MediaQuery.of(context).padding.top -
-          kToolbarHeight -
-          60 -
-          180;
-      final minRowHeight = availableHeight / rows;
-
-      return SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: 4,
-          right: 4,
-          top: 4,
-          bottom: keyboardVisible ? 200 : 4,
-        ),
-        child: LayoutGrid(
-          columnSizes: List.filled(columns, 1.fr),
-          rowSizes: List.filled(totalRows > 0 ? totalRows : 1, minRowHeight.px),
-          columnGap: 4,
-          rowGap: 4,
-          children: allCells,
-        ),
-      );
-    }
-  }
-
-  Widget _buildEmptyCell() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildItemCard(BuildContext context, dynamic item) {
-    if (item is CategoryModel) {
-      return _buildCategoryCard(context, item);
-    } else if (item is CategorySymbolModel) {
-      return _buildSymbolCard(context, item);
-    }
-    return const SizedBox.shrink();
-  }
-
-  // ========== CATEGORY CARD ==========
-
-  Widget _buildCategoryCard(BuildContext context, CategoryModel category) {
-    final card = GestureDetector(
-      onTap: _deleteMode
-          ? () => _confirmDeleteCategory(context, category)
-          : () => context.push('/folder/${widget.profileId}/c/${category.id}'),
-      onLongPress: () => _showCategoryMenu(context, category),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Color(category.backgroundColor),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.black.withOpacity(0.1), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(6.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 5,
-                    child: Center(child: _buildCategoryIcon(category)),
-                  ),
-                  const SizedBox(height: 2),
-                  Expanded(
-                    flex: 2,
-                    child: Center(
-                      child: Text(
-                        category.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(category.textColor),
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Folder badge
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.folder, size: 16, color: Color(category.iconColor)),
-              ),
-            ),
-            // Delete badge
-            if (_deleteMode)
-              Positioned(
-                top: 4,
-                left: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close, size: 16, color: Colors.white),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    // Tryb usuwania vs normalny - tap obsługiwany przez GestureDetector
-    return card;
-  }
-
-  Widget _buildCategoryIcon(CategoryModel category) {
-    Widget iconWidget;
-    if (category.iconPath != null && category.iconPath!.isNotEmpty) {
-      final file = File(category.iconPath!);
-      if (file.existsSync()) {
-        iconWidget = Image.file(file, fit: BoxFit.contain);
-      } else {
-        iconWidget = Icon(Icons.folder, size: 200, color: Color(category.iconColor));
-      }
-    } else if (category.emoji != null && category.emoji!.isNotEmpty) {
-      iconWidget = Text(category.emoji!, style: const TextStyle(fontSize: 200));
-    } else {
-      iconWidget = Icon(Icons.folder, size: 200, color: Color(category.iconColor));
-    }
-    return FittedBox(
-      fit: BoxFit.contain,
-      child: Padding(padding: const EdgeInsets.all(4.0), child: iconWidget),
-    );
-  }
-
-  // ========== SYMBOL CARD ==========
-
-  Widget _buildSymbolCard(BuildContext context, CategorySymbolModel symbol) {
-    final librarySymbolAsync = ref.watch(_librarySymbolProvider(symbol.librarySymbolId));
-
-    return librarySymbolAsync.when(
-      data: (librarySymbol) {
-        if (librarySymbol == null) return const SizedBox.shrink();
-
-        final name = symbol.nameOverride ?? librarySymbol.name;
-        final emoji = symbol.emojiOverride ?? librarySymbol.emoji;
-        final imagePath = symbol.imagePathOverride ?? librarySymbol.imagePath;
-
-        final card = GestureDetector(
-          onTap: _deleteMode
-              ? () => _confirmDeleteSymbol(context, symbol, name)
-              : () => _handleSymbolTap(symbol, librarySymbol),
-          onLongPress: () => _showSymbolInfo(context, symbol, librarySymbol),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Color(symbol.backgroundColor),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.black.withOpacity(0.1), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(6.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Center(child: _buildSymbolIcon(emoji, imagePath)),
-                      ),
-                      const SizedBox(height: 2),
-                      Expanded(
-                        flex: 2,
-                        child: Center(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Voice recording indicator
-                if (symbol.voiceRecordingPath != null)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.mic, size: 12, color: Colors.white),
-                    ),
-                  ),
-                // Delete badge
-                if (_deleteMode)
-                  Positioned(
-                    top: 4,
-                    left: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-
-        // Tap obsługiwany przez GestureDetector
-        return card;
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildSymbolIcon(String? emoji, String? imagePath) {
-    Widget iconWidget;
-    if (imagePath != null && imagePath.isNotEmpty) {
-      if (imagePath.startsWith('assets/')) {
-        iconWidget = Image.asset(imagePath, fit: BoxFit.contain);
-      } else {
-        final file = File(imagePath);
-        if (file.existsSync()) {
-          iconWidget = Image.file(file, fit: BoxFit.contain);
-        } else {
-          iconWidget = const Icon(Icons.image, size: 64, color: Colors.grey);
-        }
-      }
-    } else if (emoji != null && emoji.isNotEmpty) {
-      iconWidget = FittedBox(
-        fit: BoxFit.contain,
-        child: Text(emoji, style: const TextStyle(fontSize: 64)),
-      );
-    } else {
-      iconWidget = const Icon(Icons.image, size: 64, color: Colors.grey);
-    }
-    return Padding(padding: const EdgeInsets.all(4.0), child: iconWidget);
-  }
-
-  // ========== SYMBOL TAP - TTS/AUDIO ==========
-
-  void _handleSymbolTap(CategorySymbolModel categorySymbol, LibrarySymbolModel librarySymbol) async {
-    // 1. Dodaj symbol do message container
-    final messageSymbol = MessageSymbol.fromCategorySymbol(categorySymbol, librarySymbol);
-    ref.read(messageSymbolsProvider.notifier).add(messageSymbol);
-
-    // 2. Odtwórz dźwięk
-    try {
-      if (categorySymbol.voiceRecordingPath != null) {
-        final audioPlayer = ref.read(audioPlayerServiceProvider);
-        await audioPlayer.play(categorySymbol.voiceRecordingPath!);
-      } else {
-        final ttsService = ref.read(ttsServiceProvider);
-        final name = categorySymbol.nameOverride ?? librarySymbol.name;
-        await ttsService.speak(name);
-      }
-    } catch (e) {
-      print('❌ Error playing audio/TTS: $e');
-    }
-  }
-
-  // ========== SYMBOL INFO DIALOG ==========
-
-  void _showSymbolInfo(
-      BuildContext context,
-      CategorySymbolModel categorySymbol,
-      LibrarySymbolModel librarySymbol,
-      ) {
-    final name = categorySymbol.nameOverride ?? librarySymbol.name;
-    final emoji = categorySymbol.emojiOverride ?? librarySymbol.emoji;
-    final imagePath = categorySymbol.imagePathOverride ?? librarySymbol.imagePath;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Color(categorySymbol.backgroundColor),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: _buildSymbolPreview(emoji, imagePath),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                name,
-                style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              if (categorySymbol.voiceRecordingPath != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.mic, size: 16, color: Colors.green[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Ma nagranie głosu',
-                        style: TextStyle(fontSize: 12, color: Colors.green[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(AppLocalizations.of(context)!.close, style: const TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        context.push('/folder/${widget.profileId}/edit-symbol/${categorySymbol.id}?categoryId=${widget.categoryId ?? ''}');
-                      },
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(AppLocalizations.of(context)!.edit, style: const TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSymbolPreview(String? emoji, String? imagePath) {
-    if (imagePath != null && imagePath.isNotEmpty) {
-      if (imagePath.startsWith('assets/')) {
-        return Image.asset(imagePath, fit: BoxFit.cover);
-      } else {
-        return Image.file(
-          File(imagePath),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(Icons.broken_image, size: 48, color: Colors.grey);
-          },
-        );
-      }
-    } else if (emoji != null && emoji.isNotEmpty) {
-      return Center(child: Text(emoji, style: const TextStyle(fontSize: 64)));
-    } else {
-      return const Icon(Icons.image, size: 48, color: Colors.grey);
-    }
-  }
-
-  // ========== CATEGORY MENU ==========
-
-  void _showCategoryMenu(BuildContext context, CategoryModel category) {
-    final l10n = AppLocalizations.of(context)!;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text(
-                category.name,
-                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMenuButton(
-                      icon: Icons.edit,
-                      label: l10n.editCategory,
-                      color: const Color(0xFFFDD835),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        context.push('/folder/${widget.profileId}/category-editor?categoryId=${category.id}');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMenuButton(
-                      icon: Icons.delete,
-                      label: l10n.deleteCategory,
-                      color: const Color(0xFFE53935),
-                      iconColor: Colors.white,
-                      textColor: Colors.white,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _confirmDeleteCategory(context, category);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    Color iconColor = Colors.black87,
-    Color textColor = Colors.black87,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 36, color: iconColor),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textColor),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== DELETE CONFIRMATIONS ==========
-
-  Future<void> _confirmDeleteCategory(BuildContext context, CategoryModel category) async {
-    final l10n = AppLocalizations.of(context)!;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.deleteCategory),
-        content: Text(l10n.confirmDeleteCategoryWithContent(category.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final repository = await ref.read(categoryRepositoryProvider.future);
-      await repository.deleteWithChildren(category.id);
-
-      setState(() => _deleteMode = false);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.categoryDeleted), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _confirmDeleteSymbol(BuildContext context, CategorySymbolModel symbol, String name) async {
-    final l10n = AppLocalizations.of(context)!;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.deleteSymbol),
-        content: Text(l10n.confirmDeleteSymbol(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final repository = await ref.read(categorySymbolRepositoryProvider.future);
-      await repository.delete(symbol.id);
-
-      setState(() => _deleteMode = false);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.symbolDeleted), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  // ========== ADD DIALOG ==========
-
-  void _showAddDialog(BuildContext context, AppLocalizations l10n) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const Text(
-                'Co chcesz dodać?',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildAddButton(
-                      icon: Icons.create_new_folder,
-                      label: l10n.addCategory,
-                      color: const Color(0xFF42A5F5),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        final parentParam = widget.categoryId != null
-                            ? '&parentId=${widget.categoryId}'
-                            : '';
-                        context.push('/folder/${widget.profileId}/category-editor?$parentParam');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildAddButton(
-                      icon: Icons.add_photo_alternate,
-                      label: l10n.addSymbol,
-                      color: const Color(0xFF66BB6A),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        final categoryParam = widget.categoryId != null
-                            ? '?categoryId=${widget.categoryId}'
-                            : '';
-                        context.push('/folder/${widget.profileId}/add-symbol$categoryParam');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
+    return Scaffold(
+      drawer: _isRoot && caregiver ? AppDrawer(profileId: widget.profileId, profile: profile) : null,
+      body: SafeArea(
+        bottom: !caregiver,
         child: Column(
           children: [
-            Icon(icon, size: 40, color: Colors.white),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            _buildTopBar(context, profile, category, caregiver, isSystemBoard, screen.width),
+            if (showSentence)
+              SentenceBar(
+                flyTargetKey: _flyTarget,
+                jaPhotoPath: profile?.photoPath,
+                compact: compact,
+                onSaveAsTile: caregiver
+                    ? () => showSaveSentenceSheet(
+                          context,
+                          profileId: widget.profileId,
+                          categoryId: widget.categoryId,
+                          nextPosition: _nextPosition(items),
+                          folderName: category?.name ?? l10n.startBoard,
+                        )
+                    : null,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== GRID CONFIG DIALOG ==========
-
-  Future<void> _showGridConfigDialog(BuildContext context) async {
-    final gridConfigsNotifier = ref.read(symbolsGridConfigsProvider.notifier);
-    final categoryId = widget.categoryId ?? 'root_${widget.profileId}';
-    final defaultConfig = _currentCategory?.gridConfig ?? GridConfig(columns: 3, rows: 3);
-
-    final currentConfig = gridConfigsNotifier.getConfig(categoryId, defaultConfig);
-
-    final result = await showDialog<(int, int)>(
-      context: context,
-      builder: (context) => GridConfigDialog(
-        initialColumns: currentConfig.columns,
-        initialRows: currentConfig.rows,
-        title: AppLocalizations.of(context)!.grid,
-      ),
-    );
-
-    if (result != null) {
-      final (columns, rows) = result;
-
-      await gridConfigsNotifier.setConfig(
-        categoryId,
-        SymbolsGridConfig(columns: columns, rows: rows),
-      );
-
-      if (context.mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.gridSet(columns, rows)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
-        setState(() {});
-      }
-    }
-  }
-
-  void _showReorderSheet(BuildContext context) {
-    final contentAsync = ref.read(folderContentProvider(widget.profileId, widget.categoryId));
-
-    contentAsync.whenData((content) {
-      // Połącz i POSORTUJ po pozycji!
-      final items = <dynamic>[...content.categories, ...content.symbols];
-      items.sort((a, b) {
-        final posA = a is CategoryModel ? a.position : (a as CategorySymbolModel).position;
-        final posB = b is CategoryModel ? b.position : (b as CategorySymbolModel).position;
-        return posA.compareTo(posB);
-      });
-
-      if (items.isEmpty) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.noItemsToSort)),
-        );
-        return;
-      }
-
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        builder: (ctx) => _ReorderBottomSheet(
-          items: items,
-          onSave: (reorderedItems) => _saveNewOrder(reorderedItems),
-        ),
-      );
-    });
-  }
-
-  Future<void> _saveNewOrder(List<dynamic> reorderedItems) async {
-    try {
-      print('🔄 === SAVING NEW ORDER ===');
-
-      for (int i = 0; i < reorderedItems.length; i++) {
-        final item = reorderedItems[i];
-        if (item is CategoryModel) {
-          print('📁 [$i] Kategoria: ${item.name} (stara pozycja: ${item.position})');
-        } else if (item is CategorySymbolModel) {
-          print('🖼️ [$i] Symbol: ${item.nameOverride ?? item.id} (stara pozycja: ${item.position})');
-        }
-      }
-
-      final catRepo = await ref.read(categoryRepositoryProvider.future);
-      final symRepo = await ref.read(categorySymbolRepositoryProvider.future);
-
-      // Zapisz każdy element z nową pozycją BEZPOŚREDNIO (nie przez updatePositions!)
-      for (int i = 0; i < reorderedItems.length; i++) {
-        final item = reorderedItems[i];
-        if (item is CategoryModel) {
-          final updated = item.copyWith(position: i);
-          await catRepo.update(updated);
-          print('📁 Zapisano kategorię "${item.name}" na pozycję $i');
-        } else if (item is CategorySymbolModel) {
-          final updated = item.copyWith(position: i);
-          await symRepo.update(updated);
-          print('🖼️ Zapisano symbol "${item.nameOverride ?? item.id}" na pozycję $i');
-        }
-      }
-
-      print('✅ Zapisano ${reorderedItems.length} elementów');
-
-      // Wymuś odświeżenie
-      ref.invalidate(folderContentProvider(widget.profileId, widget.categoryId));
-
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.orderSaved),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Błąd zapisywania: $e');
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  // ========== EMPTY STATE ==========
-
-  Widget _buildEmptyState(BuildContext context, AppLocalizations l10n) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            widget.categoryId == null ? Icons.category_outlined : Icons.grid_view,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            widget.categoryId == null ? l10n.noCategories : l10n.folderEmpty,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.addFirstCategory,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _showAddDialog(context, l10n),
-            icon: const Icon(Icons.add),
-            label: Text(l10n.add),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ========== DRAWER ==========
-
-  Future<void> _handleExportProfile(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(l10n.exporting),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      final service = await ref.read(backupServiceProvider.future);
-      final zipPath = await service.exportProfile(widget.profileId);
-      final bytes = await File(zipPath).readAsBytes();
-      final fileName = zipPath.split('/').last;
-
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-
-      // Systemowe okno "Zapisz jako" - użytkownik wybiera folder (np. Pobrane).
-      final savedPath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.exportProfile,
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['zip'],
-        bytes: bytes,
-      );
-
-      if (savedPath != null) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(l10n.exportSaved),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('${l10n.exportError}: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _handleImportProfile(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
-
-    // Wybór pliku ZIP.
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-    );
-    if (picked == null || picked.files.single.path == null) return;
-    final zipPath = picked.files.single.path!;
-
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(l10n.importing),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    try {
-      final service = await ref.read(backupServiceProvider.future);
-      final result = await service.importProfile(zipPath);
-
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-
-      // Odśwież listę profili.
-      ref.invalidate(profileRepositoryProvider);
-
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(l10n.importSuccess),
-            content: Text(l10n.importSummary(
-              result.profileName,
-              result.categories,
-              result.symbols,
-            )),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  context.go('/profiles');
+            if (caregiver) _CaregiverStrip(deleteMode: deleteMode),
+            if (_isRoot && settings.showCoreWords && !(landscape && compact))
+              _buildCoreBand(profile, settings, caregiver),
+            Expanded(
+              child: itemsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text(l10n.error(e.toString()))),
+                data: (items) {
+                  if (items.isEmpty) {
+                    return _EmptyBoard(
+                      caregiver: caregiver,
+                      isRoot: _isRoot,
+                      onAdd: () => _showAddSheet(allowFolders: !isSystemBoard),
+                    );
+                  }
+                  return BoardGrid(
+                    columns: columns,
+                    rows: rows,
+                    padding: EdgeInsets.fromLTRB(12, caregiver ? 14 : 6, 12, 12),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _buildTile(
+                      items[index],
+                      profile: profile,
+                      settings: settings,
+                      mode: mode,
+                      caregiver: caregiver,
+                      deleteMode: deleteMode,
+                    ),
+                  );
                 },
-                child: Text(l10n.close),
               ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('${l10n.importError}: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Widget _buildDrawer(BuildContext context, AppLocalizations l10n) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Colors.grey[800] : Colors.white;
-    final bgColor = isDark ? Colors.grey[900] : Colors.grey[50];
-    final textColor = isDark ? Colors.white : Colors.black87;
-
-    return Drawer(
-      child: Container(
-        color: bgColor,
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Container(
-                width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[200],
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Opacity(
-                        opacity: isDark ? 0.12 : 0.25,
-                        child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: isDark
-                                ? [
-                              Colors.grey[900]!.withOpacity(0.8),
-                              Colors.grey[850]!.withOpacity(0.9)
-                            ]
-                                : [
-                              Colors.white.withOpacity(0.8),
-                              Colors.grey[100]!.withOpacity(0.9)
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 90,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF7E57C2),
-                              border: Border.all(
-                                color: isDark ? Colors.grey[700]! : Colors.white,
-                                width: 4,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(isDark ? 0.4 : 0.2),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: _profile?.photoPath != null &&
-                                _profile!.photoPath!.isNotEmpty &&
-                                File(_profile!.photoPath!).existsSync()
-                                ? ClipOval(
-                              child: Image.file(
-                                File(_profile!.photoPath!),
-                                fit: BoxFit.cover,
-                                width: 90,
-                                height: 90,
-                              ),
-                            )
-                                : Center(
-                              child: Text(
-                                _profile?.name.isNotEmpty == true
-                                    ? _profile!.name[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  fontSize: 40,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _profile?.name ?? '',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF333333),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.appTitle,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Menu items
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildDrawerItem(
-                      icon: Icons.library_books,
-                      label: l10n.library,
-                      color: const Color(0xFF7E57C2),
-                      cardColor: cardColor!,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/library');
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildThemeToggle(context, cardColor, textColor),
-                    const SizedBox(height: 12),
-                    Divider(color: isDark ? Colors.grey[700] : Colors.grey[300]),
-                    const SizedBox(height: 12),
-                    _buildDrawerItem(
-                      icon: Icons.refresh,
-                      label: l10n.addDefaultCategoriesMenu,
-                      color: const Color(0xFFFFB74D),
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showAddDefaultCategoriesDialog(context);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDrawerItem(
-                      icon: Icons.add_photo_alternate,
-                      label: l10n.addDefaultSymbolsMenu,
-                      color: const Color(0xFF42A5F5),
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showAddDefaultSymbolsDialog(context);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDrawerItem(
-                      icon: Icons.upload_file,
-                      label: l10n.exportProfile,
-                      color: const Color(0xFF26A69A),
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleExportProfile(context);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDrawerItem(
-                      icon: Icons.download,
-                      label: l10n.importProfile,
-                      color: const Color(0xFF5C6BC0),
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _handleImportProfile(context);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Divider(color: isDark ? Colors.grey[700] : Colors.grey[300]),
-                    const SizedBox(height: 12),
-                    _buildDrawerItem(
-                      icon: Icons.logout,
-                      label: l10n.logout,
-                      color: const Color(0xFFE53935),
-                      cardColor: cardColor,
-                      textColor: textColor,
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/profiles');
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Stopka: wersja + autor (akApp) + linki prawne
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${l10n.appTitle}${_appVersion.isNotEmpty ? ' v$_appVersion' : ''}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      l10n.createdBy,
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                    ),
-                    const SizedBox(height: 4),
-                    // Logo akApp - klik otwiera stronę autora
-                    InkWell(
-                      onTap: () => openExternalUrl(context, AppLinks.website),
-                      borderRadius: BorderRadius.circular(24),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/akapp_logo.png',
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Linki prawne
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        InkWell(
-                          onTap: () =>
-                              openExternalUrl(context, AppLinks.terms),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            child: Text(
-                              l10n.termsOfService,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Text('·', style: TextStyle(color: Colors.grey[500])),
-                        InkWell(
-                          onTap: () => openExternalUrl(
-                              context, AppLinks.privacyPolicy),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            child: Text(
-                              l10n.privacyPolicy,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+      bottomNavigationBar: caregiver
+          ? EditToolbar(
+              deleteMode: deleteMode,
+              onAdd: () => _showAddSheet(allowFolders: !isSystemBoard),
+              onReorder: () => _reorder(items),
+              onGrid: () => _configureGrid(columns, rows),
+              onToggleDelete: () => ref.read(deleteModeProvider.notifier).state = !deleteMode,
+              onDone: () => setCaregiverMode(ref, false),
+            )
+          : null,
     );
   }
 
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required Color cardColor,
-    required Color textColor,
-    required VoidCallback onTap,
+  int _nextPosition(List<BoardItem> items) {
+    var maxPos = -1;
+    for (final i in items) {
+      if (i.position > maxPos) maxPos = i.position;
+    }
+    return maxPos + 1;
+  }
+
+  Widget _buildTile(
+    BoardItem item, {
+    required ProfileModel? profile,
+    required ProfileSettings settings,
+    required CommunicationMode mode,
+    required bool caregiver,
+    required bool deleteMode,
+    bool dense = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    final isJa = isJaItem(item, profile);
+    return AacTile(
+      label: item.name,
+      imagePath: isJa ? profile!.photoPath : item.imagePath,
+      emoji: item.emoji,
+      imageFit: isJa ? BoxFit.cover : BoxFit.contain,
+      color: item.color,
+      isFolder: item.isFolder,
+      hasRecording: item.hasRecording,
+      dense: dense,
+      showEdit: caregiver && !deleteMode,
+      showDelete: caregiver && deleteMode,
+      onTap: (rect) => _onTileTap(
+        item,
+        rect,
+        mode: mode,
+        settings: settings,
+        deleteMode: caregiver && deleteMode,
+      ),
+      onLongPress: caregiver ? () => _editItem(item) : null,
+      onEdit: () => _editItem(item),
+      onDelete: () => _deleteItem(item),
+    );
+  }
+
+  Widget _buildCoreBand(
+    ProfileModel? profile,
+    ProfileSettings settings,
+    bool caregiver,
+  ) {
+    final boardAsync = ref.watch(systemBoardProvider((widget.profileId, SystemBoard.core)));
+    final board = boardAsync.valueOrNull;
+    if (board == null) return const SizedBox.shrink();
+    final itemsAsync = ref.watch(boardItemsProvider((profileId: widget.profileId, categoryId: board.id)));
+    final words = (itemsAsync.valueOrNull ?? const <BoardItem>[]).where((i) => !i.isFolder).toList();
+    if (words.isEmpty && !caregiver) return const SizedBox.shrink();
+
+    return CoreWordsBand(
+      itemCount: words.length,
+      itemBuilder: (context, index) => _buildTile(
+        words[index],
+        profile: profile,
+        settings: settings,
+        mode: CommunicationMode.text,
+        caregiver: caregiver,
+        deleteMode: false,
+        dense: true,
+      ),
+      trailing: caregiver
+          ? _EditCoreButton(onTap: () => context.push('/folder/${widget.profileId}/c/${board.id}'))
+          : null,
+    );
+  }
+
+  Widget _buildTopBar(
+    BuildContext context,
+    ProfileModel? profile,
+    CategoryModel? category,
+    bool caregiver,
+    bool isSystemBoard,
+    double width,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final narrow = width < 400;
+    final tiny = width < 380;
+    final buttonSize = tiny ? 40.0 : 44.0;
+    final gap = tiny ? 4.0 : 6.0;
+
+    final List<Widget> leading;
+    if (_isRoot) {
+      leading = [
+        if (caregiver)
+          Builder(
+            builder: (ctx) => _CircleIconButton(
+              icon: Icons.menu_rounded,
+              tooltip: l10n.menu,
+              size: buttonSize,
+              onTap: () => Scaffold.of(ctx).openDrawer(),
             ),
-          ],
+          ),
+        if (caregiver) SizedBox(width: gap),
+        ProfileAvatar(name: profile?.name ?? '', photoPath: profile?.photoPath, size: tiny ? 36 : 40),
+        SizedBox(width: gap + 2),
+        Expanded(
+          child: Text(
+            profile?.name ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+          ),
         ),
+        _CircleIconButton(
+          icon: Icons.star_rounded,
+          tooltip: l10n.frequent,
+          size: buttonSize,
+          onTap: () => context.push('/folder/${widget.profileId}/frequent'),
+        ),
+        SizedBox(width: gap),
+        _CircleIconButton(
+          icon: Icons.event_note_rounded,
+          tooltip: l10n.schedule,
+          size: buttonSize,
+          onTap: () => context.push('/folder/${widget.profileId}/schedule'),
+        ),
+      ];
+    } else {
+      leading = [
+        _CircleIconButton(
+          icon: Icons.arrow_back_rounded,
+          tooltip: l10n.back,
+          onTap: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/folder/${widget.profileId}');
+            }
+          },
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: isSystemBoard
+              ? Text(
+                  category?.name ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+                )
+              : _Breadcrumbs(profileId: widget.profileId, categoryId: widget.categoryId!),
+        ),
+      ];
+    }
+
+    return SizedBox(
+      height: 60,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
+            ...leading,
+            SizedBox(width: gap),
+            UrgentButton(
+              compact: narrow && _isRoot,
+              onTap: () => showUrgentSheet(context, widget.profileId),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right, color: Colors.grey[500]),
+            SizedBox(width: gap),
+            const LockButton(),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildThemeToggle(BuildContext context, Color cardColor, Color textColor) {
-    final l10n = AppLocalizations.of(context)!;
-    final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark;
-
-    return GestureDetector(
-      onTap: () => ref.read(themeModeProvider.notifier).toggleTheme(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF5C6BC0), const Color(0xFF3949AB)]
-                      : [const Color(0xFFFFB74D), const Color(0xFFFFA726)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isDark ? Icons.dark_mode : Icons.light_mode,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                isDark ? l10n.darkMode : l10n.lightMode,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
-            ),
-            Container(
-              width: 52,
-              height: 28,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF5C6BC0) : Colors.grey[300],
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Stack(
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 200),
-                    left: isDark ? 26 : 2,
-                    top: 2,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== DEFAULT CATEGORIES/SYMBOLS ==========
-
-  Future<void> _showAddDefaultCategoriesDialog(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final repository = await ref.read(categoryRepositoryProvider.future);
-    final existingCategories = await repository.getByProfileId(widget.profileId);
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.addDefaultCategoriesQuestion),
-        content: Text(existingCategories.isNotEmpty
-            ? l10n.newCategoriesAtEnd
-            : l10n.basicCategoriesWillBeAdded),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.add),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final defaultCategories =
-      await DefaultCategoriesService.createDefaultCategories(widget.profileId);
-      for (final category in defaultCategories) {
-        await repository.create(category);
-      }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.categoriesAdded),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _showAddDefaultSymbolsDialog(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final categoryRepository = await ref.read(categoryRepositoryProvider.future);
-    final categories = await categoryRepository.getByProfileId(widget.profileId);
-
-    if (categories.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.addCategoriesFirst),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return;
-    }
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.addDefaultSymbolsQuestion),
-        content: Text(l10n.basicSymbolsWillBeAdded),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.add),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final libraryRepo = await ref.read(librarySymbolRepositoryProvider.future);
-      final categorySymbolRepo =
-      await ref.read(categorySymbolRepositoryProvider.future);
-
-      final (librarySymbols, categorySymbols) =
-      await DefaultSymbolsService.createDefaultSymbolsForAllCategories(
-        categories,
-            () async => await libraryRepo.getAll(),
-            (categoryId) async => await categorySymbolRepo.getByCategoryId(categoryId),
-      );
-
-      await libraryRepo.createMany(librarySymbols);
-      await categorySymbolRepo.createMany(categorySymbols);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.symbolsAdded),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error(e.toString())), backgroundColor: Colors.red),
-        );
-      }
-    }
   }
 }
 
-// Provider pomocniczy dla symboli z biblioteki
-final _librarySymbolProvider = FutureProvider.family<LibrarySymbolModel?, String>(
-      (ref, librarySymbolId) async {
-    final repository = await ref.watch(librarySymbolRepositoryProvider.future);
-    return await repository.getById(librarySymbolId);
-  },
-);
+// =============================================================================
+// Elementy pomocnicze
+// =============================================================================
 
-// ========== REORDER BOTTOM SHEET WIDGET ==========
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final double size;
 
-class _ReorderBottomSheet extends ConsumerStatefulWidget {
-  final List<dynamic> items;
-  final Function(List<dynamic>) onSave;
-
-  const _ReorderBottomSheet({
-    required this.items,
-    required this.onSave,
+  const _CircleIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.size = 44,
   });
 
   @override
-  ConsumerState<_ReorderBottomSheet> createState() => _ReorderBottomSheetState();
-}
-
-class _ReorderBottomSheetState extends ConsumerState<_ReorderBottomSheet> {
-  late List<dynamic> _items;
-  final Map<String, LibrarySymbolModel> _librarySymbolsCache = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _items = List.from(widget.items);
-    _loadLibrarySymbols();
-  }
-
-  Future<void> _loadLibrarySymbols() async {
-    final libraryRepo = await ref.read(librarySymbolRepositoryProvider.future);
-
-    for (final item in _items) {
-      if (item is CategorySymbolModel) {
-        final libSymbol = await libraryRepo.getById(item.librarySymbolId);
-        if (libSymbol != null) {
-          _librarySymbolsCache[item.librarySymbolId] = libSymbol;
-        }
-      }
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: bottomPadding + 16),
-      child: Column(
-        children: [
-          // Uchwyt
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
+    final palette = context.aac;
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: palette.surface,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: palette.line, offset: const Offset(0, 2), blurRadius: 0)],
           ),
-
-          // Tytuł
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF9C27B0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.swap_vert, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Zmień kolejność',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Przytrzymaj i przeciągnij element',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-          const SizedBox(height: 16),
-
-          // Lista z ReorderableListView
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ReorderableListView.builder(
-              itemCount: _items.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) {
-                    newIndex -= 1;
-                  }
-                  final item = _items.removeAt(oldIndex);
-                  _items.insert(newIndex, item);
-                });
-              },
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return _buildReorderItem(item, index);
-              },
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Przyciski
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(AppLocalizations.of(context)!.cancel),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    widget.onSave(_items);
-                    Navigator.pop(context);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF66BB6A),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(AppLocalizations.of(context)!.save),
-                ),
-              ),
-            ],
-          ),
-        ],
+          child: Icon(icon, color: palette.ink, size: size * 0.54),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildReorderItem(dynamic item, int index) {
-    String name;
-    Color bgColor;
-    Widget icon;
-    bool isCategory;
+class _Breadcrumbs extends ConsumerWidget {
+  final String profileId;
+  final String categoryId;
 
-    if (item is CategoryModel) {
-      name = item.name;
-      bgColor = Color(item.backgroundColor);
-      isCategory = true;
-      if (item.emoji != null && item.emoji!.isNotEmpty) {
-        icon = Text(item.emoji!, style: const TextStyle(fontSize: 24));
-      } else if (item.iconPath != null && item.iconPath!.isNotEmpty && File(item.iconPath!).existsSync()) {
-        icon = Image.file(File(item.iconPath!), width: 32, height: 32, fit: BoxFit.contain);
-      } else {
-        icon = Icon(Icons.folder, color: Color(item.iconColor), size: 28);
-      }
-    } else if (item is CategorySymbolModel) {
-      bgColor = Color(item.backgroundColor);
-      isCategory = false;
+  const _Breadcrumbs({required this.profileId, required this.categoryId});
 
-      // Pobierz dane z cache
-      final libSymbol = _librarySymbolsCache[item.librarySymbolId];
-      name = item.nameOverride ?? libSymbol?.name ?? 'Symbol';
-
-      final emoji = item.emojiOverride ?? libSymbol?.emoji;
-      final imagePath = item.imagePathOverride ?? libSymbol?.imagePath;
-
-      if (imagePath != null && imagePath.isNotEmpty) {
-        if (imagePath.startsWith('assets/')) {
-          icon = Image.asset(imagePath, width: 32, height: 32, fit: BoxFit.contain);
-        } else if (File(imagePath).existsSync()) {
-          icon = Image.file(File(imagePath), width: 32, height: 32, fit: BoxFit.contain);
-        } else {
-          icon = const Icon(Icons.image, size: 28, color: Colors.grey);
-        }
-      } else if (emoji != null && emoji.isNotEmpty) {
-        icon = Text(emoji, style: const TextStyle(fontSize: 24));
-      } else {
-        icon = const Icon(Icons.image, size: 28, color: Colors.grey);
-      }
-    } else {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      key: ValueKey('${isCategory ? 'cat' : 'sym'}_${item.id}'),
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        leading: Container(
-          width: 44,
-          height: 44,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final crumbs = ref.watch(breadcrumbsProvider(categoryId)).valueOrNull ?? const <CategoryModel>[];
+    final palette = context.aac;
+    final children = <Widget>[
+      GestureDetector(
+        onTap: () => context.go('/folder/$profileId'),
+        child: Container(
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(8),
+            color: palette.surface,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: palette.line, offset: const Offset(0, 2), blurRadius: 0)],
           ),
-          child: Center(child: icon),
+          child: Icon(Icons.home_rounded, size: 19, color: palette.ink),
         ),
-        title: Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+    ];
+    for (var i = 0; i < crumbs.length; i++) {
+      final isLast = i == crumbs.length - 1;
+      final popCount = crumbs.length - 1 - i;
+      children.add(Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Icon(Icons.chevron_right_rounded, size: 20, color: palette.inkSoft),
+      ));
+      children.add(GestureDetector(
+        onTap: isLast
+            ? null
+            : () {
+                for (var n = 0; n < popCount; n++) {
+                  if (context.canPop()) context.pop();
+                }
+              },
+        child: Text(
+          crumbs[i].name,
+          style: TextStyle(
+            fontSize: isLast ? 19 : 15,
+            fontWeight: isLast ? FontWeight.w900 : FontWeight.w700,
+            color: isLast ? palette.ink : AppColors.skyDeep,
+          ),
         ),
-        subtitle: Text(
-          isCategory ? '📁 Kategoria' : '🖼️ Symbol',
-          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+      ));
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      reverse: true,
+      child: Row(children: children),
+    );
+  }
+}
+
+class _CaregiverStrip extends StatelessWidget {
+  final bool deleteMode;
+  const _CaregiverStrip({required this.deleteMode});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final color = deleteMode ? AppColors.coralDeep : AppColors.skyDeep;
+    final text = deleteMode ? l10n.deleteModeHint : l10n.caregiverModeHint;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13),
+          ),
         ),
-        trailing: Row(
+      ),
+    );
+  }
+}
+
+class _EditCoreButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _EditCoreButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.skySoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.sky, width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.edit_rounded, color: AppColors.skyDeep),
+            const SizedBox(height: 2),
+            Text(
+              l10n.editCoreWords,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(color: AppColors.skyDeep, fontWeight: FontWeight.w900, fontSize: 11.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyBoard extends StatelessWidget {
+  final bool caregiver;
+  final bool isRoot;
+  final VoidCallback onAdd;
+
+  const _EmptyBoard({required this.caregiver, required this.isRoot, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final palette = context.aac;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text('🖼️', style: TextStyle(fontSize: 56)),
+            const SizedBox(height: 12),
             Text(
-              '${index + 1}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-                fontSize: 16,
-              ),
+              isRoot ? l10n.boardEmptyTitle : l10n.folderEmpty,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(width: 8),
-            Icon(Icons.drag_handle, color: Colors.grey[600]),
+            const SizedBox(height: 6),
+            Text(
+              caregiver ? l10n.boardEmptyCaregiver : l10n.boardEmptyChild,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w600),
+            ),
+            if (caregiver) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(l10n.add),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingScreen extends StatelessWidget {
+  final String message;
+  final VoidCallback onTap;
+  const _MissingScreen({required this.message, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onTap, child: Text(l10n.selectProfile)),
           ],
         ),
       ),

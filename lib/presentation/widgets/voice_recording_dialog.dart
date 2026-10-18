@@ -1,17 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/l10n/app_localizations.dart';
-import '../../data/services/voice_recorder_service.dart';
-import '../../data/services/audio_player_service.dart';
 
+import '../../core/l10n/app_localizations.dart';
+import '../../core/theme/app_colors.dart';
+import '../../data/services/audio_player_service.dart';
+import '../../data/services/voice_recorder_service.dart';
+
+/// Nagrywanie własnego głosu dla symbolu (np. głos mamy).
+/// Zwraca ścieżkę nagrania albo null (anulowano).
 class VoiceRecordingDialog extends ConsumerStatefulWidget {
   final String? existingRecordingPath;
 
-  const VoiceRecordingDialog({
-    super.key,
-    this.existingRecordingPath,
-  });
+  const VoiceRecordingDialog({super.key, this.existingRecordingPath});
 
   @override
   ConsumerState<VoiceRecordingDialog> createState() => _VoiceRecordingDialogState();
@@ -21,7 +23,7 @@ class _VoiceRecordingDialogState extends ConsumerState<VoiceRecordingDialog> {
   bool _isRecording = false;
   bool _isPlaying = false;
   String? _recordingPath;
-  Duration _recordingDuration = Duration.zero;
+  Duration _duration = Duration.zero;
   Timer? _timer;
 
   @override
@@ -36,291 +38,154 @@ class _VoiceRecordingDialogState extends ConsumerState<VoiceRecordingDialog> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return AlertDialog(
-      title: Text(l10n.voiceRecording),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Timer nagrywania
-          if (_isRecording)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _formatDuration(_recordingDuration),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-
-          // Ikona statusu
-          Icon(
-            _isRecording
-                ? Icons.mic
-                : _recordingPath != null
-                ? Icons.check_circle
-                : Icons.mic_none,
-            size: 80,
-            color: _isRecording
-                ? Colors.red
-                : _recordingPath != null
-                ? Colors.green
-                : Colors.grey,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Przyciski
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Start/Stop nagrywania
-              if (!_isRecording && _recordingPath == null)
-                _buildButton(
-                  icon: Icons.fiber_manual_record,
-                  color: Colors.red,
-                  label: l10n.recordVoice,
-                  onPressed: _startRecording,
-                ),
-
-              if (_isRecording)
-                _buildButton(
-                  icon: Icons.stop,
-                  color: Colors.red,
-                  label: 'Stop',
-                  onPressed: _stopRecording,
-                ),
-
-              // Play nagrania
-              if (!_isRecording && _recordingPath != null)
-                _buildButton(
-                  icon: _isPlaying ? Icons.stop : Icons.play_arrow,
-                  color: Colors.blue,
-                  label: _isPlaying ? 'Stop' : l10n.playRecording,
-                  onPressed: _isPlaying ? _stopPlaying : _playRecording,
-                ),
-
-              // Usuń nagranie
-              if (!_isRecording && _recordingPath != null)
-                _buildButton(
-                  icon: Icons.delete,
-                  color: Colors.orange,
-                  label: l10n.deleteRecording,
-                  onPressed: _deleteRecording,
-                ),
-            ],
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            if (_isRecording) {
-              _cancelRecording();
-            }
-            Navigator.pop(context);
-          },
-          child: Text(l10n.cancel),
-        ),
-        if (_recordingPath != null)
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, _recordingPath);
-            },
-            child: Text(l10n.saveChanges),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: Icon(icon, size: 32),
-          color: color,
-          onPressed: onPressed,
-          style: IconButton.styleFrom(
-            backgroundColor: color.withOpacity(0.1),
-            padding: const EdgeInsets.all(16),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  Future<void> _startRecording() async {
-    final recorderService = ref.read(voiceRecorderServiceProvider);
-
-    final path = await recorderService.startRecording();
+  Future<void> _start() async {
+    final recorder = ref.read(voiceRecorderServiceProvider);
+    final path = await recorder.startRecording();
     if (path == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nie udało się rozpocząć nagrywania. Sprawdź uprawnienia.'),
-            backgroundColor: Colors.red,
-          ),
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.micPermissionNeeded)),
         );
       }
       return;
     }
-
     setState(() {
       _isRecording = true;
-      _recordingDuration = Duration.zero;
+      _duration = Duration.zero;
     });
-
-    // Start timer
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          _recordingDuration = Duration(seconds: timer.tick);
-        });
-      }
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _duration += const Duration(seconds: 1));
     });
   }
 
-  Future<void> _stopRecording() async {
-    final recorderService = ref.read(voiceRecorderServiceProvider);
-
-    final path = await recorderService.stopRecording();
-
+  Future<void> _stop() async {
     _timer?.cancel();
-
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _recordingPath = path;
-      });
-
-      if (path != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✔ Nagranie zapisane'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
+    final path = await ref.read(voiceRecorderServiceProvider).stopRecording();
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      if (path != null) _recordingPath = path;
+    });
   }
 
-  Future<void> _cancelRecording() async {
-    final recorderService = ref.read(voiceRecorderServiceProvider);
-    await recorderService.cancelRecording();
-
-    _timer?.cancel();
-
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _recordingPath = null;
-        _recordingDuration = Duration.zero;
-      });
-    }
-  }
-
-  Future<void> _playRecording() async {
-    if (_recordingPath == null) return;
-
-    final playerService = ref.read(audioPlayerServiceProvider);
-
-    try {
-      await playerService.play(_recordingPath!);
-
-      setState(() {
-        _isPlaying = true;
-      });
-
-      // Auto-stop po zakończeniu (listener w service to załatwi)
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() {
-            _isPlaying = false;
-          });
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Błąd odtwarzania: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  Future<void> _play() async {
+    final path = _recordingPath;
+    if (path == null) return;
+    setState(() => _isPlaying = true);
+    await ref.read(audioPlayerServiceProvider).playAndWait(path);
+    if (mounted) setState(() => _isPlaying = false);
   }
 
   Future<void> _stopPlaying() async {
-    final playerService = ref.read(audioPlayerServiceProvider);
-    await playerService.stop();
-
-    setState(() {
-      _isPlaying = false;
-    });
+    await ref.read(audioPlayerServiceProvider).stop();
+    if (mounted) setState(() => _isPlaying = false);
   }
 
-  Future<void> _deleteRecording() async {
-    if (_recordingPath == null) return;
+  Future<void> _cancel() async {
+    _timer?.cancel();
+    if (_isRecording) {
+      await ref.read(voiceRecorderServiceProvider).cancelRecording();
+    }
+    if (mounted) Navigator.pop(context);
+  }
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Usuń nagranie'),
-        content: const Text('Czy na pewno chcesz usunąć to nagranie?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Anuluj'),
+  String _format(Duration d) =>
+      '${d.inMinutes.toString().padLeft(2, '0')}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final palette = context.aac;
+    final hasRecording = _recordingPath != null && !_isRecording;
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.voiceRecording, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(
+                l10n.voiceRecordingHint,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: _isRecording ? _stop : _start,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isRecording ? AppColors.coral : AppColors.coral.withValues(alpha: 0.15),
+                    boxShadow: _isRecording
+                        ? [BoxShadow(color: AppColors.coral.withValues(alpha: 0.35), spreadRadius: 10, blurRadius: 0)]
+                        : const [],
+                  ),
+                  child: Icon(
+                    _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                    size: 52,
+                    color: _isRecording ? Colors.white : AppColors.coralDeep,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _isRecording
+                    ? _format(_duration)
+                    : (hasRecording ? l10n.recordingReady : l10n.tapToRecord),
+                style: TextStyle(
+                  fontSize: _isRecording ? 26 : 16,
+                  fontWeight: FontWeight.w900,
+                  color: _isRecording ? AppColors.coralDeep : palette.ink,
+                ),
+              ),
+              if (hasRecording) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isPlaying ? _stopPlaying : _play,
+                        icon: Icon(_isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                        label: Text(_isPlaying ? l10n.stop : l10n.playRecording),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _start,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(l10n.recordAgain),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(onPressed: _cancel, child: Text(l10n.cancel)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: hasRecording ? () => Navigator.pop(context, _recordingPath) : null,
+                      child: Text(l10n.save),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Usuń'),
-          ),
-        ],
+        ),
       ),
     );
-
-    if (confirm != true) return;
-
-    final recorderService = ref.read(voiceRecorderServiceProvider);
-    final success = await recorderService.deleteRecording(_recordingPath!);
-
-    if (success && mounted) {
-      setState(() {
-        _recordingPath = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✔ Nagranie usunięte'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 }

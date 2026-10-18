@@ -10,15 +10,22 @@ symbole, nagrania) przechowywane są wyłącznie lokalnie na urządzeniu.
 
 ## Funkcje
 
-- Profile użytkowników i własne tablice komunikacyjne (kategorie + symbole)
-- Wbudowana biblioteka symboli + dodawanie własnych (galeria / aparat)
-- Odczyt mowy (TTS) oraz własne nagrania głosowe dla symboli
-- Konfigurowalna siatka (kolumny/wiersze), kolory, motyw jasny/ciemny
-- Pełna lokalna baza danych (Isar), brak wysyłki danych na serwer
+- Tablica startowa ze **słowami kluczowymi** (chcę, nie, tak, jeszcze, pomóż…) na stałych miejscach
+- **Pasek zdania** w kształcie dymka: dotykane obrazki układają się w zdanie, przycisk „Mów” czyta je
+  na głos i podświetla czytane słowo
+- **Pilne** – przycisk w górnym pasku z dużymi kafelkami mówionymi od razu (toaleta, boli, pić…)
+- **Plan dnia** z obrazków („Teraz” / „Potem”, odhaczanie kroków)
+- **Częste** – najczęściej używane słowa danego profilu
+- **Zapis zdania jako kafelka** (kolaż obrazków)
+- **Tryb opiekuna** za kłódką – do wyboru: zadanie dla dorosłego, PIN albo przytrzymanie
+- Kolory kafelków wg **klucza Fitzgeralda**, zdjęcie dziecka na kafelku „ja”
+- Profile użytkowników, własne foldery i obrazki (galeria / aparat / emoji), własne nagrania głosu
+- Ustawienia głosu (wybór polskiego głosu, tempo, wysokość), tryb jasny/ciemny, tablety i poziom
+- Kopia zapasowa profilu do pliku ZIP; wszystko lokalnie, bez konta i bez internetu
 
 ## Stos technologiczny
 
-- Flutter + Riverpod (stan), go_router (nawigacja)
+- Flutter + Riverpod (stan), go_router (nawigacja), font Nunito (SIL OFL, w `assets/fonts`)
 - Isar (lokalna baza), flutter_tts / record / audioplayers (mowa i dźwięk)
 - Lokalizacja przez flutter_localizations + ARB
 
@@ -26,6 +33,7 @@ symbole, nagrania) przechowywane są wyłącznie lokalnie na urządzeniu.
 
 ```bash
 flutter pub get
+dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 

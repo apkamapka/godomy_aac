@@ -1,7 +1,8 @@
-import 'package:audioplayers/audioplayers.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'dart:async';
 
-import 'audio_player_service.dart' as audioplayers;
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'audio_player_service.g.dart';
 
@@ -10,105 +11,68 @@ AudioPlayerService audioPlayerService(AudioPlayerServiceRef ref) {
   return AudioPlayerService();
 }
 
-enum PlayerState {
-  idle,
-  playing,
-  paused,
-  stopped,
-  completed,
-}
-
+/// Odtwarzanie własnych nagrań głosu.
+///
+/// `playAndWait` czeka do końca nagrania – potrzebne przy czytaniu całego
+/// zdania (poprzednia wersja nie czekała i nagrania się nakładały).
 class AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
-  PlayerState _state = PlayerState.idle;
   String? _currentFilePath;
 
-  PlayerState get state => _state;
   String? get currentFilePath => _currentFilePath;
 
-  AudioPlayerService() {
-    _setupListeners();
+  bool get isPlaying => _player.state == PlayerState.playing;
+
+  /// Odtwórz nagranie z pliku (bez czekania na koniec).
+  Future<void> play(String filePath) async {
+    await stop();
+    _currentFilePath = filePath;
+    await _player.play(DeviceFileSource(filePath));
   }
 
-  void _setupListeners() {
-    _player.onPlayerStateChanged.listen((state) {
-      switch (state) {
-        case audioplayers.PlayerState.playing:
-          _state = PlayerState.playing;
-          break;
-        case audioplayers.PlayerState.paused:
-          _state = PlayerState.paused;
-          break;
-        case audioplayers.PlayerState.stopped:
-          _state = PlayerState.stopped;
-          break;
-        case audioplayers.PlayerState.completed:
-          _state = PlayerState.completed;
-          break;
-        default:
-          _state = PlayerState.idle;
+  /// Odtwórz nagranie i poczekaj na jego koniec.
+  /// Zwraca `true`, gdy nagranie doszło do końca, `false` gdy przerwano.
+  Future<bool> playAndWait(
+    String filePath, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    await stop();
+    _currentFilePath = filePath;
+
+    final completer = Completer<bool>();
+    var started = false;
+
+    final completeSub = _player.onPlayerComplete.listen((_) {
+      if (!completer.isCompleted) completer.complete(true);
+    });
+    final stateSub = _player.onPlayerStateChanged.listen((state) {
+      if (state == PlayerState.playing) started = true;
+      if (started && state == PlayerState.stopped && !completer.isCompleted) {
+        completer.complete(false);
       }
     });
-  }
 
-  /// Odtwórz nagranie z pliku
-  Future<void> play(String filePath) async {
     try {
-      // Zatrzymaj jeśli coś już gra
-      await stop();
-
-      _currentFilePath = filePath;
-
       await _player.play(DeviceFileSource(filePath));
-
-      print('▶️ Playing: $filePath');
+      return await completer.future.timeout(timeout, onTimeout: () => false);
     } catch (e) {
-      print('❌ Error playing audio: $e');
-      _state = PlayerState.idle;
-      rethrow;
+      if (kDebugMode) debugPrint('Audio error: $e');
+      return false;
+    } finally {
+      await completeSub.cancel();
+      await stateSub.cancel();
     }
   }
 
   /// Zatrzymaj odtwarzanie
   Future<void> stop() async {
     try {
-      await _player.stop();
-      _state = PlayerState.stopped;
-      print('⏹️ Audio stopped');
-    } catch (e) {
-      print('❌ Error stopping audio: $e');
-    }
+      if (_player.state == PlayerState.playing || _player.state == PlayerState.paused) {
+        await _player.stop();
+      }
+    } catch (_) {}
   }
 
-  /// Pauza
-  Future<void> pause() async {
-    try {
-      await _player.pause();
-      _state = PlayerState.paused;
-      print('⏸️ Audio paused');
-    } catch (e) {
-      print('❌ Error pausing audio: $e');
-    }
-  }
-
-  /// Wznów
-  Future<void> resume() async {
-    try {
-      await _player.resume();
-      _state = PlayerState.playing;
-      print('▶️ Audio resumed');
-    } catch (e) {
-      print('❌ Error resuming audio: $e');
-    }
-  }
-
-  /// Sprawdź czy odtwarza
-  bool get isPlaying => _state == PlayerState.playing;
-
-  /// Sprawdź czy jest w pauzie
-  bool get isPaused => _state == PlayerState.paused;
-
-  /// Dispose
   void dispose() {
     _player.dispose();
   }
