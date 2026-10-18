@@ -1,181 +1,113 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../presentation/screens/splash_screen.dart';
-import '../../presentation/screens/profiles_screen.dart';
-import '../../presentation/screens/profile_editor_screen.dart';
-import '../../presentation/screens/folder_screen.dart';
+
 import '../../presentation/screens/category_editor_screen.dart';
-import '../../presentation/screens/add_symbol_screen.dart';
-import '../../presentation/screens/edit_symbol_screen.dart';
+import '../../presentation/screens/folder_screen.dart';
+import '../../presentation/screens/frequent_screen.dart';
 import '../../presentation/screens/library_screen.dart';
-import '../../presentation/screens/library_add_symbol_screen.dart';
-import '../../presentation/screens/library_edit_symbol_screen.dart';
+import '../../presentation/screens/library_symbol_editor_screen.dart';
+import '../../presentation/screens/profile_editor_screen.dart';
+import '../../presentation/screens/profiles_screen.dart';
+import '../../presentation/screens/schedule_screen.dart';
+import '../../presentation/screens/settings_screen.dart';
+import '../../presentation/screens/splash_screen.dart';
+import '../../presentation/screens/symbol_editor_screen.dart';
+import '../../presentation/screens/welcome_screen.dart';
 
-part 'app_router.g.dart';
+String? _param(String? value) => (value == null || value.isEmpty) ? null : value;
 
-@riverpod
-GoRouter appRouter(AppRouterRef ref) {
-  return GoRouter(
+/// Nawigacja (zwykły Provider – bez generowania kodu).
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final router = GoRouter(
     initialLocation: '/splash',
     routes: [
-      // Splash Screen
       GoRoute(
         path: '/splash',
-        name: 'splash',
         builder: (context, state) => const SplashScreen(),
       ),
-
-      // Profiles Screen
+      GoRoute(
+        path: '/welcome',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
       GoRoute(
         path: '/profiles',
-        name: 'profiles',
         builder: (context, state) => const ProfilesScreen(),
       ),
-
-      // Profile Editor Screen
       GoRoute(
         path: '/profile-editor',
-        name: 'profile-editor',
-        builder: (context, state) {
-          final profileId = state.uri.queryParameters['id'];
-          return ProfileEditorScreen(profileId: profileId);
-        },
+        builder: (context, state) => ProfileEditorScreen(
+          profileId: _param(state.uri.queryParameters['id']),
+          firstRun: state.uri.queryParameters['first'] == '1',
+        ),
       ),
 
-      // === FOLDER ROUTES (nowa hierarchia) ===
-
-      // Folder Screen - root level
+      // === Tablica i foldery ===
       GoRoute(
         path: '/folder/:profileId',
-        name: 'folder',
-        builder: (context, state) {
-          final profileId = state.pathParameters['profileId'];
-          if (profileId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak ID profilu')),
-            );
-          }
-          return FolderScreen(
-            profileId: profileId,
-            categoryId: null,
-          );
-        },
+        builder: (context, state) => FolderScreen(
+          key: ValueKey('board_${state.pathParameters['profileId']}'),
+          profileId: state.pathParameters['profileId']!,
+        ),
       ),
-
-      // Folder Screen - inside category
       GoRoute(
         path: '/folder/:profileId/c/:categoryId',
-        name: 'folder-category',
-        builder: (context, state) {
-          final profileId = state.pathParameters['profileId'];
-          final categoryId = state.pathParameters['categoryId'];
-          if (profileId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak ID profilu')),
-            );
-          }
-          return FolderScreen(
-            profileId: profileId,
-            categoryId: categoryId,
-          );
-        },
+        builder: (context, state) => FolderScreen(
+          key: ValueKey('board_${state.pathParameters['profileId']}_${state.pathParameters['categoryId']}'),
+          profileId: state.pathParameters['profileId']!,
+          categoryId: state.pathParameters['categoryId'],
+        ),
       ),
-
-      // Category Editor - create/edit
       GoRoute(
         path: '/folder/:profileId/category-editor',
-        name: 'folder-category-editor',
-        builder: (context, state) {
-          final profileId = state.pathParameters['profileId'];
-          final categoryId = state.uri.queryParameters['categoryId']; // edit mode
-          final parentId = state.uri.queryParameters['parentId']; // for new subcategory
-
-          if (profileId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak ID profilu')),
-            );
-          }
-
-          return CategoryEditorScreen(
-            profileId: profileId,
-            categoryId: categoryId,
-            parentId: parentId,
-          );
-        },
+        builder: (context, state) => CategoryEditorScreen(
+          profileId: state.pathParameters['profileId']!,
+          categoryId: _param(state.uri.queryParameters['categoryId']),
+          parentId: _param(state.uri.queryParameters['parentId']),
+        ),
       ),
-
-      // Add Symbol
       GoRoute(
         path: '/folder/:profileId/add-symbol',
-        name: 'folder-add-symbol',
-        builder: (context, state) {
-          final profileId = state.pathParameters['profileId'];
-          final categoryId = state.uri.queryParameters['categoryId']; // null = root
-
-          if (profileId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak ID profilu')),
-            );
-          }
-
-          return AddSymbolScreen(
-            profileId: profileId,
-            categoryId: categoryId,
-          );
-        },
+        builder: (context, state) => SymbolEditorScreen(
+          profileId: state.pathParameters['profileId']!,
+          categoryId: _param(state.uri.queryParameters['categoryId']),
+        ),
       ),
-
-      // Edit Symbol
       GoRoute(
         path: '/folder/:profileId/edit-symbol/:symbolId',
-        name: 'folder-edit-symbol',
-        builder: (context, state) {
-          final profileId = state.pathParameters['profileId'];
-          final symbolId = state.pathParameters['symbolId'];
-          final categoryId = state.uri.queryParameters['categoryId'];
-
-          if (profileId == null || symbolId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak wymaganych parametrów')),
-            );
-          }
-
-          return EditSymbolScreen(
-            profileId: profileId,
-            categoryId: categoryId,
-            symbolId: symbolId,
-          );
-        },
+        builder: (context, state) => SymbolEditorScreen(
+          profileId: state.pathParameters['profileId']!,
+          symbolId: state.pathParameters['symbolId'],
+        ),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/frequent',
+        builder: (context, state) => FrequentScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/schedule',
+        builder: (context, state) => ScheduleScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/settings',
+        builder: (context, state) => SettingsScreen(profileId: state.pathParameters['profileId']!),
       ),
 
-      // === LIBRARY ROUTES (bez zmian) ===
-
+      // === Biblioteka ===
       GoRoute(
         path: '/library',
-        name: 'library',
         builder: (context, state) => const LibraryScreen(),
       ),
-
       GoRoute(
         path: '/library/add',
-        name: 'library-add-symbol',
-        builder: (context, state) => const LibraryAddSymbolScreen(),
+        builder: (context, state) => const LibrarySymbolEditorScreen(),
       ),
-
       GoRoute(
         path: '/library/edit/:symbolId',
-        name: 'library-edit-symbol',
-        builder: (context, state) {
-          final symbolId = state.pathParameters['symbolId'];
-          if (symbolId == null) {
-            return const Scaffold(
-              body: Center(child: Text('Brak ID symbolu')),
-            );
-          }
-          return LibraryEditSymbolScreen(symbolId: symbolId);
-        },
+        builder: (context, state) => LibrarySymbolEditorScreen(symbolId: state.pathParameters['symbolId']),
       ),
     ],
   );
-}
+  ref.onDispose(router.dispose);
+  return router;
+});

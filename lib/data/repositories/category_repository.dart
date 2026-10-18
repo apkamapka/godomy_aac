@@ -117,9 +117,61 @@ class CategoryRepository {
     await _isar.categoryModels.delete(fastHash(id));
   }
 
+  // READ - tablica systemowa profilu (słowa kluczowe / Pilne / Plan dnia),
+  // rozpoznawana po znaczniku w parentId (patrz SystemIds).
+  Future<CategoryModel?> getSystemCategory(String profileId, String systemParent) async {
+    return await _isar.categoryModels
+        .filter()
+        .profileIdEqualTo(profileId)
+        .parentIdEqualTo(systemParent)
+        .findFirst();
+  }
+
+  // DELETE - cała zawartość profilu (kategorie, podkategorie, symbole,
+  // także symbole z tablicy startowej o podanym rootId).
+  Future<void> deleteProfileContent(String profileId, String rootId) async {
+    await _isar.writeTxn(() async {
+      final categories = await _isar.categoryModels
+          .filter()
+          .profileIdEqualTo(profileId)
+          .findAll();
+      for (final c in categories) {
+        final symbols = await _isar.categorySymbolModels
+            .filter()
+            .categoryIdEqualTo(c.id)
+            .findAll();
+        await _isar.categorySymbolModels.deleteAll(
+          symbols.map((s) => fastHash(s.id)).toList(),
+        );
+      }
+      await _isar.categoryModels.deleteAll(
+        categories.map((c) => fastHash(c.id)).toList(),
+      );
+      final rootSymbols = await _isar.categorySymbolModels
+          .filter()
+          .categoryIdEqualTo(rootId)
+          .findAll();
+      await _isar.categorySymbolModels.deleteAll(
+        rootSymbols.map((s) => fastHash(s.id)).toList(),
+      );
+    });
+  }
+
+  // UPDATE - wiele naraz (np. zapis kolejności)
+  Future<void> updateMany(List<CategoryModel> categories) async {
+    await _isar.writeTxn(() async {
+      await _isar.categoryModels.putAll(categories);
+    });
+  }
+
   // READ - po ID
   Future<CategoryModel?> getById(String id) async {
     return await _isar.categoryModels.get(fastHash(id));
+  }
+
+  // READ - po ID, na żywo
+  Stream<CategoryModel?> watchById(String id) {
+    return _isar.categoryModels.watchObject(fastHash(id), fireImmediately: true);
   }
 
   // UPDATE

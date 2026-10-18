@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -59,13 +60,13 @@ class VoiceRecorderService {
       // Sprawdź uprawnienia
       final hasPermission = await checkPermission();
       if (!hasPermission) {
-        print('❌ No microphone permission');
+        if (kDebugMode) debugPrint('❌ No microphone permission');
         return null;
       }
 
       // Sprawdź czy już nagrywa
       if (_state == RecordingState.recording) {
-        print('⚠️ Already recording');
+        if (kDebugMode) debugPrint('⚠️ Already recording');
         return null;
       }
 
@@ -94,10 +95,9 @@ class VoiceRecorderService {
       _recordingStartTime = DateTime.now();
       _state = RecordingState.recording;
 
-      print('🔴 Recording started: $filePath');
       return filePath;
     } catch (e) {
-      print('❌ Error starting recording: $e');
+      if (kDebugMode) debugPrint('❌ Error starting recording: $e');
       _state = RecordingState.idle;
       return null;
     }
@@ -107,21 +107,16 @@ class VoiceRecorderService {
   Future<String?> stopRecording() async {
     try {
       if (_state != RecordingState.recording) {
-        print('⚠️ Not recording');
+        if (kDebugMode) debugPrint('⚠️ Not recording');
         return null;
       }
 
-      final path = await _recorder.stop();
+      await _recorder.stop();
 
       _state = RecordingState.stopped;
-      final savedPath = _currentRecordingPath;
-
-      print('⏹️ Recording stopped: $savedPath');
-      print('📊 Duration: ${DateTime.now().difference(_recordingStartTime!).inSeconds}s');
-
-      return savedPath;
+      return _currentRecordingPath;
     } catch (e) {
-      print('❌ Error stopping recording: $e');
+      if (kDebugMode) debugPrint('❌ Error stopping recording: $e');
       _state = RecordingState.idle;
       return null;
     }
@@ -138,7 +133,6 @@ class VoiceRecorderService {
         final file = File(_currentRecordingPath!);
         if (await file.exists()) {
           await file.delete();
-          print('🗑️ Recording cancelled and deleted');
         }
       }
 
@@ -146,7 +140,7 @@ class VoiceRecorderService {
       _recordingStartTime = null;
       _state = RecordingState.idle;
     } catch (e) {
-      print('❌ Error cancelling recording: $e');
+      if (kDebugMode) debugPrint('❌ Error cancelling recording: $e');
     }
   }
 
@@ -156,12 +150,11 @@ class VoiceRecorderService {
       final file = File(filePath);
       if (await file.exists()) {
         await file.delete();
-        print('🗑️ Recording deleted: $filePath');
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting recording: $e');
+      if (kDebugMode) debugPrint('❌ Error deleting recording: $e');
       return false;
     }
   }

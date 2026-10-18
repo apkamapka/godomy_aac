@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -8,49 +11,99 @@ TTSService ttsService(TtsServiceRef ref) {
   return TTSService();
 }
 
+/// Callback postępu mowy – zakres znaków aktualnie czytanego słowa.
+typedef SpeechProgress = void Function(int start, int end);
+
+/// Synteza mowy (systemowy TTS, działa offline jeśli głos jest pobrany).
+///
+/// `speak` czeka, aż wypowiedź się skończy (awaitSpeakCompletion), więc da się
+/// po kolei odczytywać zdanie i podświetlać aktualne słowo.
 class TTSService {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isInitialized = false;
+  Future<void>? _initFuture;
 
-  /// Inicjalizacja TTS
-  Future<void> initialize() async {
-    if (_isInitialized) return;
+  SpeechProgress? _onProgress;
 
+  String? _voiceName;
+  String? _voiceLocale;
+  double _rate = 0.5;
+  double _pitch = 1.0;
+
+  Future<void> initialize() {
+    return _initFuture ??= _doInitialize();
+  }
+
+  Future<void> _doInitialize() async {
     try {
-      // Domyślne ustawienia
       await _flutterTts.setLanguage('pl-PL');
-      await _flutterTts.setSpeechRate(0.5);
-      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setSpeechRate(_rate);
+      await _flutterTts.setPitch(_pitch);
       await _flutterTts.setVolume(1.0);
+      await _flutterTts.awaitSpeakCompletion(true);
 
-      // Callbacks (opcjonalne - do debugowania)
-      _flutterTts.setStartHandler(() {
-        print('🗣️ TTS: Start speaking');
+      _flutterTts.setProgressHandler((text, start, end, word) {
+        _onProgress?.call(start, end);
       });
-
-      _flutterTts.setCompletionHandler(() {
-        print('✅ TTS: Completed');
-      });
-
       _flutterTts.setErrorHandler((msg) {
-        print('❌ TTS Error: $msg');
+        if (kDebugMode) debugPrint('TTS error: $msg');
       });
 
       _isInitialized = true;
-      print('✅ TTS Service initialized');
     } catch (e) {
-      print('❌ TTS Initialization failed: $e');
+      _initFuture = null;
+      if (kDebugMode) debugPrint('TTS init failed: $e');
       rethrow;
     }
   }
+
+  bool get isInitialized => _isInitialized;
+
+  /// Ustawienia głosu z profilu (tempo 0.1–1.0, wysokość 0.5–2.0).
+  Future<void> applySettings({
+    String? voiceName,
+    String? voiceLocale,
+    double rate = 0.5,
+    double pitch = 1.0,
+  }) async {
+    try {
+      await initialize();
+    } catch (_) {
+      return; // Brak silnika TTS – nic do ustawienia.
+    }
+    _rate = rate.clamp(0.1, 1.0);
+    _pitch = pitch.clamp(0.5, 2.0);
+    try {
+      await _flutterTts.setSpeechRate(_rate);
+      await _flutterTts.setPitch(_pitch);
+      if (voiceName != null && voiceName.isNotEmpty) {
+        if (voiceName != _voiceName) {
+          await _flutterTts.setVoice({
+            'name': voiceName,
+            'locale': (voiceLocale == null || voiceLocale.isEmpty) ? 'pl-PL' : voiceLocale,
+          });
+        }
+      } else if (_voiceName != null) {
+        // Powrót do domyślnego głosu polskiego.
+        await _flutterTts.clearVoice();
+        await _flutterTts.setLanguage('pl-PL');
+      }
+      _voiceName = (voiceName == null || voiceName.isEmpty) ? null : voiceName;
+      _voiceLocale = voiceLocale;
+    } catch (e) {
+      if (kDebugMode) debugPrint('TTS settings error: $e');
+    }
+  }
+
+  String? get currentVoiceName => _voiceName;
+  String? get currentVoiceLocale => _voiceLocale;
 
   /// Sprawdzenie czy TTS jest dostępny
   Future<bool> isAvailable() async {
     try {
       final voices = await _flutterTts.getVoices;
-      return voices != null && voices.isNotEmpty;
-    } catch (e) {
-      print('❌ TTS not available: $e');
+      return voices != null && (voices as List).isNotEmpty;
+    } catch (_) {
       return false;
     }
   }
@@ -58,74 +111,59 @@ class TTSService {
   /// Pobranie dostępnych głosów
   Future<List<Map<String, String>>> getVoices() async {
     try {
+      await initialize();
       final voices = await _flutterTts.getVoices;
       if (voices == null) return [];
-
-      return voices
-          .map<Map<String, String>>((voice) => {
-        'name': voice['name']?.toString() ?? '',
-        'locale': voice['locale']?.toString() ?? '',
-      })
+      return (voices as List)
+          .map<Map<String, String>>((voice) {
+            final map = voice as Map;
+            return {
+              'name': map['name']?.toString() ?? '',
+              'locale': map['locale']?.toString() ?? '',
+            };
+          })
+          .where((v) => v['name']!.isNotEmpty)
           .toList();
-    } catch (e) {
-      print('❌ Error getting voices: $e');
+    } catch (_) {
       return [];
     }
   }
 
-  /// Pobranie polskich głosów
+  /// Głosy polskie (locale zaczyna się od „pl”).
   Future<List<Map<String, String>>> getPolishVoices() async {
     final allVoices = await getVoices();
-    return allVoices
-        .where((voice) => voice['locale']?.startsWith('pl') == true)
+    final polish = allVoices
+        .where((voice) => voice['locale']!.toLowerCase().startsWith('pl'))
         .toList();
+    polish.sort((a, b) => a['name']!.compareTo(b['name']!));
+    return polish;
   }
 
-  /// Ustawienie języka
-  Future<void> setLanguage(String language) async {
-    await initialize();
-    await _flutterTts.setLanguage(language);
-  }
-
-  /// Ustawienie głosu
-  Future<void> setVoice(String voiceId) async {
-    await initialize();
-    await _flutterTts.setVoice({'name': voiceId, 'locale': 'pl-PL'});
-  }
-
-  /// Ustawienie prędkości (0.0 - 1.0)
-  Future<void> setRate(double rate) async {
-    await initialize();
-    await _flutterTts.setSpeechRate(rate);
-  }
-
-  /// Ustawienie wysokości (0.5 - 2.0)
-  Future<void> setPitch(double pitch) async {
-    await initialize();
-    await _flutterTts.setPitch(pitch);
-  }
-
-  /// Ustawienie głośności (0.0 - 1.0)
-  Future<void> setVolume(double volume) async {
-    await initialize();
-    await _flutterTts.setVolume(volume);
-  }
-
-  /// Wypowiedz tekst
-  Future<void> speak(String text) async {
-    if (text.trim().isEmpty) return;
-
-    await initialize();
-
-    // Zatrzymaj jeśli coś już mówi
-    await stop();
+  /// Wypowiada tekst i czeka na koniec wypowiedzi.
+  /// Zwraca `true`, jeśli wypowiedź doszła do końca (nie została przerwana).
+  Future<bool> speak(String text, {SpeechProgress? onProgress}) async {
+    final clean = text.trim();
+    if (clean.isEmpty) return true;
 
     try {
-      await _flutterTts.speak(text);
-      print('🗣️ Speaking: "$text"');
+      await initialize();
+    } catch (_) {
+      return false;
+    }
+    await stop();
+
+    _onProgress = onProgress;
+    try {
+      // Zabezpieczenie: gdyby silnik TTS nie zgłosił końca, nie wisimy w nieskończoność.
+      final words = clean.split(RegExp(r'\s+')).length;
+      final timeout = Duration(milliseconds: 4000 + words * 1500);
+      final result = await _flutterTts.speak(clean).timeout(timeout, onTimeout: () => 0);
+      return result == 1;
     } catch (e) {
-      print('❌ Error speaking: $e');
-      rethrow;
+      if (kDebugMode) debugPrint('TTS speak error: $e');
+      return false;
+    } finally {
+      _onProgress = null;
     }
   }
 
@@ -133,20 +171,17 @@ class TTSService {
   Future<void> stop() async {
     try {
       await _flutterTts.stop();
-      print('⏹️ TTS stopped');
-    } catch (e) {
-      print('❌ Error stopping TTS: $e');
-    }
+    } catch (_) {}
   }
 
   /// Test głosu z przykładowym tekstem
   Future<void> testVoice() async {
-    await speak('Witaj! To jest test głosu.');
+    await speak('Cześć! Tak brzmi mój głos.');
   }
 
-  /// Dispose (cleanup)
   void dispose() {
     _flutterTts.stop();
     _isInitialized = false;
+    _initFuture = null;
   }
 }

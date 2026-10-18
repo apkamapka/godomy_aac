@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -73,10 +74,9 @@ class SymbolsGridConfigs extends _$SymbolsGridConfigs {
         });
 
         state = configs;
-        print('✅ Załadowano ${configs.length} konfiguracji siatki');
       }
     } catch (e) {
-      print('⚠️ Błąd ładowania konfiguracji: $e');
+      if (kDebugMode) debugPrint('⚠️ Błąd ładowania konfiguracji: $e');
     }
   }
 
@@ -91,9 +91,8 @@ class SymbolsGridConfigs extends _$SymbolsGridConfigs {
       });
 
       await prefs.setString(_storageKey, json.encode(encoded));
-      print('💾 Zapisano ${state.length} konfiguracji siatki');
     } catch (e) {
-      print('⚠️ Błąd zapisywania konfiguracji: $e');
+      if (kDebugMode) debugPrint('⚠️ Błąd zapisywania konfiguracji: $e');
     }
   }
 
@@ -112,7 +111,6 @@ class SymbolsGridConfigs extends _$SymbolsGridConfigs {
       categoryId: config,
     };
     await _saveToStorage();
-    print('✅ Zapisano siatkę dla $categoryId: ${config.columns}x${config.rows}');
   }
 
   // Resetuj do domyślnej z kategorii
@@ -121,6 +119,5 @@ class SymbolsGridConfigs extends _$SymbolsGridConfigs {
     newState.remove(categoryId);
     state = newState;
     await _saveToStorage();
-    print('🔄 Zresetowano siatkę dla $categoryId');
   }
 }

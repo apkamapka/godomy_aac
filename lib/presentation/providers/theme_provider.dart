@@ -2,51 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Provider do przechowywania ThemeMode
+import '../../data/services/app_settings.dart';
+
+/// Motyw (systemowy / jasny / ciemny). Odczyt synchroniczny z ustawień
+/// wczytanych w `main()` – bez mignięcia złym motywem przy starcie.
 final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
-  return ThemeModeNotifier();
+  return ThemeModeNotifier(ref.watch(appPrefsProvider));
 });
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
-  ThemeModeNotifier() : super(ThemeMode.system) {
-    _loadThemeMode();
+  static const _key = 'isDarkMode';
+  final SharedPreferences _prefs;
+
+  ThemeModeNotifier(this._prefs) : super(_read(_prefs));
+
+  static ThemeMode _read(SharedPreferences prefs) {
+    final isDark = prefs.getBool(_key);
+    if (isDark == null) return ThemeMode.system;
+    return isDark ? ThemeMode.dark : ThemeMode.light;
   }
 
-  Future<void> _loadThemeMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('isDarkMode');
-
-    if (isDark == null) {
-      state = ThemeMode.system;
-    } else if (isDark) {
-      state = ThemeMode.dark;
-    } else {
-      state = ThemeMode.light;
-    }
-  }
-
-  Future<void> toggleTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    if (state == ThemeMode.light) {
-      state = ThemeMode.dark;
-      await prefs.setBool('isDarkMode', true);
-    } else {
-      state = ThemeMode.light;
-      await prefs.setBool('isDarkMode', false);
-    }
-  }
+  Future<void> toggleTheme() =>
+      setThemeMode(state == ThemeMode.light ? ThemeMode.dark : ThemeMode.light);
 
   Future<void> setThemeMode(ThemeMode mode) async {
     state = mode;
-    final prefs = await SharedPreferences.getInstance();
-
-    if (mode == ThemeMode.dark) {
-      await prefs.setBool('isDarkMode', true);
-    } else if (mode == ThemeMode.light) {
-      await prefs.setBool('isDarkMode', false);
+    if (mode == ThemeMode.system) {
+      await _prefs.remove(_key);
     } else {
-      await prefs.remove('isDarkMode');
+      await _prefs.setBool(_key, mode == ThemeMode.dark);
     }
   }
 }

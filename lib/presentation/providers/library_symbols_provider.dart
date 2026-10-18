@@ -5,17 +5,11 @@ import '../../data/repositories/library_symbol_repository.dart';
 
 part 'library_symbols_provider.g.dart';
 
-// ✅ DODAJ autoDispose - to wymusza odświeżanie!
 @riverpod
 Stream<List<LibrarySymbolModel>> librarySymbols(Ref ref) async* {
-  print('🔄 [PROVIDER] librarySymbols - tworzę nowy stream');
   final repository = await ref.watch(librarySymbolRepositoryProvider.future);
-
   // Nasłuchuj na zmiany w bazie danych
-  await for (final symbols in repository.watchAll()) {
-    print('📡 [PROVIDER] Otrzymano ${symbols.length} symboli z Isar');
-    yield symbols;
-  }
+  yield* repository.watchAll();
 }
 
 // Provider dla wyszukiwania

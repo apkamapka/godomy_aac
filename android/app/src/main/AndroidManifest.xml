@@ -1,11 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Uprawnienia dla zdjęć -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <!-- Dla Android 13+ (API 33+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Zdjęcia wybieramy systemowym selektorem (image_picker / file_picker),
+         więc uprawnienia do pamięci i READ_MEDIA_IMAGES nie są potrzebne. -->
 
     <!-- Mikrofon (nagrywanie głosu) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -55,6 +50,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Synteza mowy (TTS) na Androidzie 11+ – widoczność silnika mowy -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
         </intent>
         <!-- Pozwala url_launcher otwierać linki https w przeglądarce (Android 11+) -->
         <intent>

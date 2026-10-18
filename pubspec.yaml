@@ -1,7 +1,7 @@
 name: godomy_aac
 description: godoMyAAC - AAC Communication App
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -41,26 +41,18 @@ dependencies:
   # Numer wersji aplikacji (czytany automatycznie z pubspec)
   package_info_plus: ^8.0.0
 
-  # Kopie zapasowe profili (pakowanie ZIP + udostępnianie pliku)
+  # Kopie zapasowe profili (pakowanie ZIP)
   archive: ^3.6.1
-  share_plus: ^10.0.0
 
   # Images
   image_picker: ^1.0.7
   file_picker: ^8.0.0
-  cached_network_image: ^3.3.1
-  flutter_image_compress: ^2.1.0
-  flutter_layout_grid: ^2.0.7
-  gif_view: ^0.4.3
 
   # Storage & Utils
   path_provider: ^2.1.2
   permission_handler: ^11.3.0
   uuid: ^4.3.3
   shared_preferences: ^2.2.2
-
-  # Color Picker
-  flutter_colorpicker: ^1.0.3
 
 dev_dependencies:
   flutter_test:
@@ -74,9 +66,6 @@ dev_dependencies:
   json_serializable: ^6.7.1
   isar_generator: ^3.1.0+1
 
-  # sprawdzanie tych samych grafik
-  crypto: ^3.0.3
-
   # Testing
   mocktail: ^1.0.3
 
@@ -88,9 +77,22 @@ flutter:
   generate: true
 
   assets:
-    - assets/category_icons/
+    - assets/symbols/
     - assets/images/
-    - assets/ui_icons/
+    - assets/fonts/OFL.txt
+
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+        - asset: assets/fonts/Nunito-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Nunito-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Nunito-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Nunito-Black.ttf
+          weight: 900
 
 # Wymuszamy starszą wersję record_platform_interface (bez startStream)
 dependency_overrides:

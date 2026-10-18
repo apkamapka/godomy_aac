@@ -3,7 +3,10 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../core/constants/system_ids.dart';
 
 import '../models/profile_model.dart';
 import '../models/category_model.dart';
@@ -18,7 +21,7 @@ import '../repositories/library_symbol_repository.dart';
 ///
 /// Podbijaj, jeśli zmieni się struktura danych - pozwala wykryć i obsłużyć
 /// stare kopie po aktualizacji aplikacji.
-const int kBackupFormatVersion = 1;
+const int kBackupFormatVersion = 2;
 
 /// Wynik importu - ile czego odtworzono.
 class ImportResult {
@@ -46,12 +49,18 @@ class BackupService {
   final CategorySymbolRepository categorySymbolRepo;
   final LibrarySymbolRepository librarySymbolRepo;
 
+  /// Ustawienia profilu (tryb mówienia, pasek zdania itd.) – opcjonalnie.
+  final SharedPreferences? prefs;
+
   BackupService({
     required this.profileRepo,
     required this.categoryRepo,
     required this.categorySymbolRepo,
     required this.librarySymbolRepo,
+    this.prefs,
   });
+
+  static String _settingsKey(String profileId) => 'profile_settings_$profileId';
 
   static const _uuid = Uuid();
 
@@ -67,11 +76,14 @@ class BackupService {
     // Całe drzewo kategorii profilu (wszystkie poziomy).
     final categories = await categoryRepo.getByProfileId(profileId);
 
-    // Symbole we wszystkich tych kategoriach.
+    // Symbole we wszystkich tych kategoriach + na tablicy startowej.
     final categorySymbols = <CategorySymbolModel>[];
     for (final cat in categories) {
       categorySymbols.addAll(await categorySymbolRepo.getByCategoryId(cat.id));
     }
+    categorySymbols.addAll(
+      await categorySymbolRepo.getRoot(SystemIds.rootOf(profileId), includeLegacy: true),
+    );
 
     // Tylko te symbole z biblioteki, które są faktycznie używane.
     final usedLibraryIds =
@@ -109,10 +121,12 @@ class BackupService {
     }
 
     // Zbuduj JSON. Ścieżki plików zapisujemy jako nazwy względne w ZIP.
+    final settingsRaw = prefs?.getString(_settingsKey(profileId));
     final manifest = {
       'formatVersion': kBackupFormatVersion,
       'exportedAt': DateTime.now().toIso8601String(),
       'profile': _profileToJson(profile, fileMap),
+      if (settingsRaw != null) 'profileSettings': jsonDecode(settingsRaw),
       'categories':
           categories.map((c) => _categoryToJson(c, fileMap)).toList(),
       'categorySymbols':
@@ -186,6 +200,13 @@ class BackupService {
       return restoredPaths[zipName];
     }
 
+    // Nadpisania obrazka/emoji: pusty napis = „świadomie bez” – zachowujemy.
+    String? resolveOverride(String? zipName) {
+      if (zipName == null) return null;
+      if (zipName.isEmpty) return '';
+      return resolvePath(zipName);
+    }
+
     final now = DateTime.now();
 
     // --- Profil: nowy ID, nazwa z dopiskiem (import) ---
@@ -237,6 +258,14 @@ class BackupService {
     final newCategories = <CategoryModel>[];
     for (final c in catJson) {
       final oldParent = c['parentId'] as String?;
+      final String? newParent;
+      if (oldParent == null) {
+        newParent = null;
+      } else if (SystemIds.isSystemParent(oldParent)) {
+        newParent = oldParent; // tablica systemowa (słowa kluczowe, Pilne, Plan dnia)
+      } else {
+        newParent = catIdMap[oldParent];
+      }
       newCategories.add(CategoryModel(
         id: catIdMap[c['id'] as String]!,
         name: c['name'] as String,
@@ -255,7 +284,7 @@ class BackupService {
         scrollLocked: c['scrollLocked'] as bool? ?? false,
         position: c['position'] as int? ?? 0,
         profileId: newProfileId,
-        parentId: oldParent == null ? null : catIdMap[oldParent],
+        parentId: newParent,
         createdAt: now,
         updatedAt: now,
       ));
@@ -265,14 +294,18 @@ class BackupService {
     final symJson =
         (manifest['categorySymbols'] as List).cast<Map<String, dynamic>>();
     final newSymbols = <CategorySymbolModel>[];
+    final newRoot = SystemIds.rootOf(newProfileId);
     for (final s in symJson) {
       final oldCat = s['categoryId'] as String?;
+      // Symbole z tablicy startowej (stare: null, nowe: root:<profil>).
+      final newCat = (oldCat == null || SystemIds.isRoot(oldCat)) ? newRoot : catIdMap[oldCat];
+      if (newCat == null) continue;
       newSymbols.add(CategorySymbolModel(
         id: _uuid.v4(),
         librarySymbolId: s['librarySymbolId'] as String,
-        categoryId: oldCat == null ? null : catIdMap[oldCat],
+        categoryId: newCat,
         nameOverride: s['nameOverride'] as String?,
-        imagePathOverride: resolvePath(s['imagePathOverride'] as String?),
+        imagePathOverride: resolveOverride(s['imagePathOverride'] as String?),
         emojiOverride: s['emojiOverride'] as String?,
         backgroundColor: s['backgroundColor'] as int,
         voiceRecordingPath: resolvePath(s['voiceRecordingPath'] as String?),
@@ -284,6 +317,10 @@ class BackupService {
 
     // --- Zapis (profil, potem kategorie, potem symbole) ---
     await profileRepo.create(profile);
+    final importedSettings = manifest['profileSettings'];
+    if (importedSettings is Map && prefs != null) {
+      await prefs!.setString(_settingsKey(newProfileId), jsonEncode(importedSettings));
+    }
     for (final c in newCategories) {
       await categoryRepo.create(c);
     }
@@ -337,8 +374,9 @@ class BackupService {
         'librarySymbolId': s.librarySymbolId,
         'categoryId': s.categoryId,
         'nameOverride': s.nameOverride,
-        'imagePathOverride':
-            s.imagePathOverride != null && s.imagePathOverride!.startsWith('assets/')
+        'imagePathOverride': s.imagePathOverride == null
+            ? null
+            : (s.imagePathOverride!.isEmpty || s.imagePathOverride!.startsWith('assets/'))
                 ? s.imagePathOverride
                 : fileMap[s.imagePathOverride],
         'emojiOverride': s.emojiOverride,

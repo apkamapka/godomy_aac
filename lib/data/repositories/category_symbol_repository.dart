@@ -69,6 +69,56 @@ class CategorySymbolRepository {
         .watch(fireImmediately: true);
   }
 
+  // READ - symbole tablicy startowej profilu.
+  // `includeLegacy` dokłada stare symbole z categoryId == null (sprzed 1.1),
+  // które nie były przypisane do żadnego profilu.
+  Future<List<CategorySymbolModel>> getRoot(String rootId, {bool includeLegacy = false}) async {
+    if (!includeLegacy) {
+      return await _isar.categorySymbolModels
+          .filter()
+          .categoryIdEqualTo(rootId)
+          .sortByPosition()
+          .findAll();
+    }
+    return await _isar.categorySymbolModels
+        .filter()
+        .categoryIdEqualTo(rootId)
+        .or()
+        .categoryIdIsNull()
+        .sortByPosition()
+        .findAll();
+  }
+
+  Stream<List<CategorySymbolModel>> watchRoot(String rootId, {bool includeLegacy = false}) {
+    if (!includeLegacy) {
+      return _isar.categorySymbolModels
+          .filter()
+          .categoryIdEqualTo(rootId)
+          .sortByPosition()
+          .watch(fireImmediately: true);
+    }
+    return _isar.categorySymbolModels
+        .filter()
+        .categoryIdEqualTo(rootId)
+        .or()
+        .categoryIdIsNull()
+        .sortByPosition()
+        .watch(fireImmediately: true);
+  }
+
+  // READ - wiele po ID (kolejność jak w [ids], brakujące pomijane)
+  Future<List<CategorySymbolModel>> getByIds(List<String> ids) async {
+    final found = await _isar.categorySymbolModels.getAll(ids.map(fastHash).toList());
+    return found.whereType<CategorySymbolModel>().toList();
+  }
+
+  // UPDATE - wiele naraz (np. zapis kolejności)
+  Future<void> updateMany(List<CategorySymbolModel> symbols) async {
+    await _isar.writeTxn(() async {
+      await _isar.categorySymbolModels.putAll(symbols);
+    });
+  }
+
   // READ - po ID
   Future<CategorySymbolModel?> getById(String id) async {
     return await _isar.categorySymbolModels.get(fastHash(id));

@@ -52,3 +52,8 @@ app.*.map.json
 
 # Generated l10n files
 **/app_localizations*.dart
+# Klucz podpisywania release (NIGDY do gita — zawiera hasła i prywatny klucz)
+android/key.properties
+android/app/upload-keystore.jks
+*.jks
+*.keystore
