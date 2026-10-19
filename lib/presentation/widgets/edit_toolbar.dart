@@ -8,6 +8,9 @@ class EditToolbar extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onReorder;
   final VoidCallback? onGrid;
+
+  /// Wydruk tablicy do PDF (null = niedostępne, np. pusta tablica).
+  final VoidCallback? onPrint;
   final VoidCallback onToggleDelete;
   final VoidCallback onDone;
   final bool deleteMode;
@@ -20,6 +23,7 @@ class EditToolbar extends StatelessWidget {
     required this.onDone,
     required this.deleteMode,
     this.onGrid,
+    this.onPrint,
   });
 
   @override
@@ -41,7 +45,7 @@ class EditToolbar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
           child: Row(
             children: [
               _ToolButton(
@@ -62,6 +66,13 @@ class EditToolbar extends StatelessWidget {
                   label: l10n.grid,
                   color: AppColors.sunDeep,
                   onTap: onGrid!,
+                ),
+              if (onPrint != null)
+                _ToolButton(
+                  icon: Icons.print_rounded,
+                  label: l10n.print,
+                  color: AppColors.skyDeep,
+                  onTap: onPrint!,
                 ),
               _ToolButton(
                 icon: deleteMode ? Icons.delete_forever_rounded : Icons.delete_outline_rounded,
@@ -114,8 +125,8 @@ class _ToolButton extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: active ? color : color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
@@ -127,8 +138,9 @@ class _ToolButton extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textScaler: TextScaler.noScaling,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w800,
                   color: context.aac.ink,
                 ),

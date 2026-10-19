@@ -1,7 +1,7 @@
 name: godomy_aac
 description: godoMyAAC - AAC Communication App
 publish_to: 'none'
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -80,6 +80,7 @@ flutter:
     - assets/symbols/
     - assets/images/
     - assets/fonts/OFL.txt
+    - assets/licenses/
 
   fonts:
     - family: Nunito

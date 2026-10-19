@@ -22,6 +22,11 @@ Future<void> main() async {
     final text = await rootBundle.loadString('assets/fonts/OFL.txt');
     yield LicenseEntryWithLineBreaks(const ['Nunito'], text);
   });
+  // Obrazki „chcę”, „koniec”, „potrzebuję przerwy” z Noto Emoji (Apache 2.0).
+  LicenseRegistry.addLicense(() async* {
+    final text = await rootBundle.loadString('assets/licenses/noto-emoji-LICENSE.txt');
+    yield LicenseEntryWithLineBreaks(const ['Noto Emoji'], text);
+  });
 
   runApp(
     ProviderScope(

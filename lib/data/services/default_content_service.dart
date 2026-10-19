@@ -295,13 +295,13 @@ class DefaultContentService {
   /// Słowa kluczowe – zawsze w tym samym miejscu na tablicy startowej.
   static const _core = <_Sym>[
     _Sym('ja', WordKind.people, file: 'ja.webp'),
-    _Sym('chcę', WordKind.actions, emoji: '🤲'),
+    _Sym('chcę', WordKind.actions, file: 'chcę.webp'),
     _Sym('nie', WordKind.negation, file: 'nie-gif.webp'),
     _Sym('tak', WordKind.actions, file: 'tak-gif.webp'),
     _Sym('jeszcze', WordKind.describe, file: 'jeszcze.webp'),
     _Sym('pomóż', WordKind.actions, file: 'potrzebuję pomocy.webp'),
     _Sym('daj', WordKind.actions, file: 'dawać.webp'),
-    _Sym('koniec', WordKind.misc, emoji: '🏁'),
+    _Sym('koniec', WordKind.misc, file: 'koniec.webp'),
   ];
 
   /// Pilne – mówione od razu po dotknięciu.
@@ -310,7 +310,7 @@ class DefaultContentService {
     _Sym('boli mnie', WordKind.negation, file: 'boli.webp'),
     _Sym('chcę pić', WordKind.negation, file: 'pić.webp'),
     _Sym('pomocy!', WordKind.negation, file: 'potrzebuję pomocy.webp'),
-    _Sym('potrzebuję przerwy', WordKind.negation, emoji: '⏸️'),
+    _Sym('potrzebuję przerwy', WordKind.negation, file: 'przerwa.webp'),
     _Sym('chcę jeść', WordKind.negation, file: 'jeść.webp'),
   ];
 
@@ -374,6 +374,7 @@ class DefaultContentService {
   Future<void> ensureSystemBoards(String profileId) => _serialized(() => _ensureSystemBoards(profileId));
 
   Future<void> _ensureSystemBoards(String profileId) async {
+    await _upgradeEmojiSymbols();
     _LibraryIndex? library;
     for (final board in SystemBoard.values) {
       final existing = await categoryRepo.getSystemCategory(profileId, board.parentId);
@@ -400,6 +401,34 @@ class DefaultContentService {
   // ---------------------------------------------------------------------------
   // Implementacja
   // ---------------------------------------------------------------------------
+
+  /// Gotowe symbole, które w wersji 1.1 były emoji – teraz mają obrazki
+  /// (emoji potrafią znikać po odblokowaniu ekranu na niektórych telefonach).
+  static const _emojiUpgrades = {
+    'chcę': 'chcę.webp',
+    'koniec': 'koniec.webp',
+    'potrzebuję przerwy': 'przerwa.webp',
+  };
+
+  Future<void> _upgradeEmojiSymbols() async {
+    try {
+      final all = await libraryRepo.getAll();
+      final now = DateTime.now();
+      final updates = <LibrarySymbolModel>[];
+      for (final symbol in all) {
+        if (!symbol.isSystemDefault) continue;
+        if (symbol.imagePath != null && symbol.imagePath!.isNotEmpty) continue;
+        final file = _emojiUpgrades[symbol.name.trim().toLowerCase()];
+        if (file == null) continue;
+        final path = await _copyAsset(file);
+        if (path == null) continue;
+        updates.add(symbol.copyWith(imagePath: path, emoji: null, updatedAt: now));
+      }
+      if (updates.isNotEmpty) await libraryRepo.createMany(updates);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Aktualizacja obrazków nie powiodła się: $e');
+    }
+  }
 
   int _nextPosition(Iterable<int> a, Iterable<int> b) {
     var maxPos = -1;

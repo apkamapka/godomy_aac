@@ -34,14 +34,16 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 32 + MediaQuery.paddingOf(context).bottom),
         children: [
-          SectionTitle(l10n.settingsCaregiver),
-          _LockMethodPicker(),
+          SectionTitle(l10n.settingsFeatures(profile?.name ?? '')),
+          _FeatureSettings(profileId: profileId),
+          SectionTitle(l10n.settingsAccessibility),
+          _AccessibilitySettings(profileId: profileId),
           SectionTitle(l10n.settingsSpeech),
           if (profile != null) _VoiceSettings(profile: profile) else const _LoadingCard(),
-          SectionTitle(l10n.settingsBoard),
-          _BoardSettings(profileId: profileId),
+          SectionTitle(l10n.settingsCaregiver),
+          _LockMethodPicker(),
           SectionTitle(l10n.settingsDevice),
           const _DeviceSettings(),
           SectionTitle(l10n.settingsData),
@@ -327,41 +329,30 @@ class _VoiceSettingsState extends ConsumerState<_VoiceSettings> {
 }
 
 // -----------------------------------------------------------------------------
-// Tablica (ustawienia profilu)
+// Funkcje (ustawienia profilu – każde dziecko jest inne)
 // -----------------------------------------------------------------------------
 
-class _BoardSettings extends ConsumerWidget {
+class _FeatureSettings extends ConsumerWidget {
   final String profileId;
-  const _BoardSettings({required this.profileId});
+  const _FeatureSettings({required this.profileId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final settings = ref.watch(profileSettingsProvider(profileId));
+    final s = ref.watch(profileSettingsProvider(profileId));
     final notifier = ref.read(profileSettingsProvider(profileId).notifier);
 
+    Widget toggle(IconData icon, Color color, String title, String subtitle, bool value, ProfileSettings Function(bool v) apply) {
+      return SwitchListTile(
+        secondary: _IconBox(icon, color),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        value: value,
+        onChanged: (v) => notifier.update(apply(v)),
+      );
+    }
+
     return _Card(children: [
-      SwitchListTile(
-        secondary: const _IconBox(Icons.volume_up_rounded, AppColors.sky),
-        title: Text(l10n.speakOnTap),
-        subtitle: Text(l10n.speakOnTapDesc),
-        value: settings.speakOnTap,
-        onChanged: (v) => notifier.update(settings.copyWith(speakOnTap: v)),
-      ),
-      SwitchListTile(
-        secondary: const _IconBox(Icons.chat_bubble_rounded, AppColors.grape),
-        title: Text(l10n.showSentenceBar),
-        subtitle: Text(l10n.showSentenceBarDesc),
-        value: settings.showSentenceBar,
-        onChanged: (v) => notifier.update(settings.copyWith(showSentenceBar: v)),
-      ),
-      SwitchListTile(
-        secondary: const _IconBox(Icons.view_module_rounded, AppColors.leaf),
-        title: Text(l10n.showCoreWords),
-        subtitle: Text(l10n.showCoreWordsDesc),
-        value: settings.showCoreWords,
-        onChanged: (v) => notifier.update(settings.copyWith(showCoreWords: v)),
-      ),
       ListTile(
         leading: const _IconBox(Icons.person_rounded, AppColors.coral),
         title: Text(l10n.editProfile),
@@ -369,6 +360,130 @@ class _BoardSettings extends ConsumerWidget {
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => context.push('/profile-editor?id=$profileId'),
       ),
+      const Divider(height: 8, indent: 16, endIndent: 16),
+      toggle(Icons.chat_bubble_rounded, AppColors.grape, l10n.showSentenceBar, l10n.showSentenceBarDesc,
+          s.showSentenceBar, (v) => s.copyWith(showSentenceBar: v)),
+      toggle(Icons.volume_up_rounded, AppColors.sky, l10n.speakOnTap, l10n.speakOnTapDesc,
+          s.speakOnTap, (v) => s.copyWith(speakOnTap: v)),
+      toggle(Icons.view_module_rounded, AppColors.leaf, l10n.showCoreWords, l10n.showCoreWordsDesc,
+          s.showCoreWords, (v) => s.copyWith(showCoreWords: v)),
+      toggle(Icons.back_hand_rounded, AppColors.coral, l10n.featureUrgent, l10n.featureUrgentDesc,
+          s.showUrgent, (v) => s.copyWith(showUrgent: v)),
+      toggle(Icons.thumbs_up_down_rounded, AppColors.leaf, l10n.yesNo, l10n.featureYesNoDesc,
+          s.showYesNo, (v) => s.copyWith(showYesNo: v)),
+      toggle(Icons.forum_rounded, AppColors.grape, l10n.featureSentences, l10n.featureSentencesDesc,
+          s.showSentences, (v) => s.copyWith(showSentences: v)),
+      toggle(Icons.open_in_full_rounded, AppColors.sky, l10n.featureShowToPartner, l10n.featureShowToPartnerDesc,
+          s.showToPartner, (v) => s.copyWith(showToPartner: v)),
+      toggle(Icons.star_rounded, AppColors.sunDeep, l10n.frequent, l10n.featureFrequentDesc,
+          s.showFrequent, (v) => s.copyWith(showFrequent: v)),
+      toggle(Icons.event_note_rounded, AppColors.sky, l10n.schedule, l10n.featureScheduleDesc,
+          s.showSchedule, (v) => s.copyWith(showSchedule: v)),
+      toggle(Icons.face_rounded, AppColors.coral, l10n.featureJaPhoto, l10n.featureJaPhotoDesc,
+          s.jaPhoto, (v) => s.copyWith(jaPhoto: v)),
+      toggle(Icons.animation_rounded, AppColors.grape, l10n.featureAnimations, l10n.featureAnimationsDesc,
+          s.animations, (v) => s.copyWith(animations: v)),
+    ]);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Dostępność (ustawienia profilu)
+// -----------------------------------------------------------------------------
+
+/// „0,3 s”, „1 s” – sekundy po polsku.
+String _seconds(int ms) {
+  final value = ms / 1000;
+  final text = ms % 1000 == 0
+      ? value.toStringAsFixed(0)
+      : (ms % 100 == 0 ? value.toStringAsFixed(1) : value.toStringAsFixed(2));
+  return '${text.replaceAll('.', ',')} s';
+}
+
+class _AccessibilitySettings extends ConsumerWidget {
+  final String profileId;
+  const _AccessibilitySettings({required this.profileId});
+
+  static const _holdOptions = [0, 300, 600, 1000];
+  static const _guardOptions = [0, 500, 1000, 2000];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final palette = context.aac;
+    final s = ref.watch(profileSettingsProvider(profileId));
+    final notifier = ref.read(profileSettingsProvider(profileId).notifier);
+
+    Widget choices(List<int> options, int selected, ValueChanged<int> onSelected) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final o in options)
+              ChoiceChip(
+                label: Text(o == 0 ? l10n.off : _seconds(o)),
+                selected: selected == o,
+                onSelected: (_) => onSelected(o),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return _Card(children: [
+      ListTile(
+        leading: const _IconBox(Icons.touch_app_rounded, AppColors.sky),
+        title: Text(l10n.holdToActivate),
+        subtitle: Text(l10n.holdToActivateDesc),
+      ),
+      choices(_holdOptions, _holdOptions.contains(s.holdMs) ? s.holdMs : 0,
+          (v) => notifier.update(s.copyWith(holdMs: v))),
+      ListTile(
+        leading: const _IconBox(Icons.do_not_touch_rounded, AppColors.coral),
+        title: Text(l10n.repeatGuard),
+        subtitle: Text(l10n.repeatGuardDesc),
+      ),
+      choices(_guardOptions, _guardOptions.contains(s.repeatGuardMs) ? s.repeatGuardMs : 0,
+          (v) => notifier.update(s.copyWith(repeatGuardMs: v))),
+      const Divider(height: 8, indent: 16, endIndent: 16),
+      SwitchListTile(
+        secondary: const _IconBox(Icons.switch_access_shortcut_rounded, AppColors.grape),
+        title: Text(l10n.scanning),
+        subtitle: Text(l10n.scanningDesc),
+        value: s.scanning,
+        onChanged: (v) => notifier.update(s.copyWith(scanning: v)),
+      ),
+      if (s.scanning) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Row(
+            children: [
+              Text(l10n.scanningSpeed, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const Spacer(),
+              Text(
+                _seconds(s.scanIntervalMs),
+                style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+        Slider(
+          value: s.scanIntervalMs.clamp(750, 4000).toDouble(),
+          min: 750,
+          max: 4000,
+          divisions: 13,
+          onChanged: (v) => notifier.update(s.copyWith(scanIntervalMs: v.round())),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            l10n.scanningHint,
+            style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w600, fontSize: 13.5),
+          ),
+        ),
+      ],
     ]);
   }
 }

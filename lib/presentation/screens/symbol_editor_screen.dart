@@ -366,7 +366,7 @@ class _SymbolEditorScreenState extends ConsumerState<SymbolEditorScreen> {
           : Form(
               key: _formKey,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   Center(
                     child: SizedBox(

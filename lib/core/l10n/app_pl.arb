@@ -351,7 +351,7 @@
       }
     }
   },
-  "licenses": "Licencje",
+  "licenses": "Licencje bibliotek (open source)",
   "lockExplain": "Kłódka chroni tablicę przed przypadkowymi zmianami. Wybierz, jak ją otwierać:",
   "lockHold": "Przytrzymanie kłódki",
   "lockHoldDesc": "Przytrzymaj kłódkę przez 3 sekundy",
@@ -507,5 +507,73 @@
   "whoIsTalking": "Kto dziś mówi?",
   "whoIsTalkingHint": "Wybierz profil albo dodaj nowy",
   "themeLight": "Jasny",
-  "themeDark": "Ciemny"
+  "themeDark": "Ciemny",
+  "more": "Więcej",
+  "yes": "Tak",
+  "no": "Nie",
+  "off": "Wył.",
+  "yesNo": "Tak / Nie",
+  "mySentences": "Moje zdania",
+  "coreWords": "Słowa kluczowe",
+  "print": "Drukuj",
+  "showToPartner": "Pokaż",
+  "flipView": "Obróć",
+  "saveAsTileOption": "Kafelek",
+  "saveToMineHint": "Zdanie trafi do „Moich zdań” – dziecko odtworzy je jednym dotknięciem.",
+  "sentenceSavedToMine": "Zapisano w „Moich zdaniach”",
+  "sentenceAlreadySaved": "To zdanie już jest w „Moich zdaniach”",
+  "savedTab": "Zapisane",
+  "historyTab": "Ostatnie",
+  "toSentenceBar": "Do paska zdania",
+  "saveToMine": "Zapisz w „Moich zdaniach”",
+  "deleteSentence": "Usunąć zdanie?",
+  "historyClear": "Wyczyść historię",
+  "historyClearConfirm": "Usunąć wszystkie ostatnio wypowiedziane zdania?",
+  "historyEmpty": "Tu pojawią się zdania wypowiedziane przyciskiem „Mów”.",
+  "mySentencesEmpty": "Nie ma jeszcze zapisanych zdań.",
+  "mySentencesEmptyCaregiver": "Ułóż zdanie na tablicy i dotknij „Zapisz” na końcu paska zdania.",
+  "printBoardTitle": "Drukuj tablicę",
+  "printBoardHint": "Tablica „{title}” jako PDF A4 – wydrukujesz ją z telefonu albo komputera.",
+  "@printBoardHint": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "printColumns": "Kafelków w rzędzie",
+  "printIncludeCore": "Dodaj słowa kluczowe",
+  "printPreparing": "Przygotowuję PDF…",
+  "printSavePdf": "Zapisz PDF",
+  "printSaved": "Zapisano PDF – otwórz go i wydrukuj",
+  "settingsFeatures": "Funkcje dla: {name}",
+  "@settingsFeatures": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "featureUrgent": "Przycisk „Pilne”",
+  "featureUrgentDesc": "Najważniejsze potrzeby jednym dotknięciem",
+  "featureYesNoDesc": "Ekran z dwoma dużymi przyciskami",
+  "featureSentences": "Moje zdania i historia",
+  "featureSentencesDesc": "Gotowe zdania i ostatnio wypowiedziane",
+  "featureShowToPartner": "Pokaż rozmówcy",
+  "featureShowToPartnerDesc": "Zdanie na cały ekran dużymi literami",
+  "featureFrequentDesc": "Najczęściej używane obrazki",
+  "featureScheduleDesc": "Obrazkowy plan dnia: teraz i potem",
+  "featureJaPhoto": "Zdjęcie przy „ja”",
+  "featureJaPhotoDesc": "Kafelek „ja” pokazuje zdjęcie profilu",
+  "featureAnimations": "Animacje",
+  "featureAnimationsDesc": "Wlatywanie obrazka do zdania, wciskanie kafelków",
+  "settingsAccessibility": "Dostępność",
+  "holdToActivate": "Przytrzymanie kafelka",
+  "holdToActivateDesc": "Kafelek zadziała dopiero po przytrzymaniu palca",
+  "repeatGuard": "Ignoruj powtórne dotknięcia",
+  "repeatGuardDesc": "Chwila przerwy po wybraniu kafelka",
+  "scanning": "Skanowanie",
+  "scanningDesc": "Kafelki podświetlają się po kolei – dotyk ekranu wybiera",
+  "scanningSpeed": "Szybkość skanowania",
+  "scanningHint": "Wybór: dotknięcie ekranu w dowolnym miejscu albo przycisk (spacja / Enter, np. przełącznik Bluetooth). Opiekun odblokowuje kłódkę jak zwykle."
 }

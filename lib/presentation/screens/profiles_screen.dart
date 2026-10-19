@@ -14,6 +14,7 @@ import '../../data/models/profile_model.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/profile_repository.dart';
 import '../../data/services/app_settings.dart';
+import '../../data/services/sentence_store.dart';
 import '../providers/backup_provider.dart';
 import '../providers/caregiver_provider.dart';
 import '../providers/profiles_provider.dart';
@@ -92,6 +93,8 @@ class ProfilesScreen extends ConsumerWidget {
 
       final prefs = ref.read(appPrefsProvider);
       await prefs.remove(ProfileSettingsNotifier.keyFor(profile.id));
+      await prefs.remove(SavedSentencesNotifier.keyFor(profile.id));
+      await prefs.remove(SentenceHistoryNotifier.keyFor(profile.id));
       await ref.read(usageStoreProvider).clear(profile.id);
       await ref.read(scheduleProgressProvider).reset(profile.id);
       if (ref.read(appSettingsProvider).lastProfileId == profile.id) {

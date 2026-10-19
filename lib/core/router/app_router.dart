@@ -7,13 +7,16 @@ import '../../presentation/screens/folder_screen.dart';
 import '../../presentation/screens/frequent_screen.dart';
 import '../../presentation/screens/library_screen.dart';
 import '../../presentation/screens/library_symbol_editor_screen.dart';
+import '../../presentation/screens/partner_view_screen.dart';
 import '../../presentation/screens/profile_editor_screen.dart';
 import '../../presentation/screens/profiles_screen.dart';
 import '../../presentation/screens/schedule_screen.dart';
+import '../../presentation/screens/sentences_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/splash_screen.dart';
 import '../../presentation/screens/symbol_editor_screen.dart';
 import '../../presentation/screens/welcome_screen.dart';
+import '../../presentation/screens/yes_no_screen.dart';
 
 String? _param(String? value) => (value == null || value.isEmpty) ? null : value;
 
@@ -87,6 +90,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/folder/:profileId/schedule',
         builder: (context, state) => ScheduleScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/yes-no',
+        builder: (context, state) => YesNoScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/sentences',
+        builder: (context, state) => SentencesScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/folder/:profileId/show',
+        builder: (context, state) => PartnerViewScreen(profileId: state.pathParameters['profileId']!),
       ),
       GoRoute(
         path: '/folder/:profileId/settings',

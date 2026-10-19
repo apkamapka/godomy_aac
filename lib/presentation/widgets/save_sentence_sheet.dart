@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -15,18 +13,20 @@ import '../../data/models/category_symbol_model.dart';
 import '../../data/models/library_symbol_model.dart';
 import '../../data/repositories/category_symbol_repository.dart';
 import '../../data/repositories/library_symbol_repository.dart';
+import '../../data/services/sentence_store.dart';
 import '../providers/sentence_provider.dart';
 import 'app_sheet.dart';
 import 'symbol_image.dart';
 
-/// Zapis ułożonego zdania jako jednego kafelka (np. „chcę pić wodę”).
-/// Obrazek kafelka to kolaż obrazków ze zdania.
+/// Zapis ułożonego zdania: do „Moich zdań” (gotowe na później) albo jako
+/// jeden kafelek na tablicy (np. „chcę pić wodę”, obrazek = kolaż).
 Future<void> showSaveSentenceSheet(
   BuildContext context, {
   required String profileId,
   required String? categoryId,
   required int nextPosition,
   required String folderName,
+  bool allowMySentences = true,
 }) async {
   await showAppSheet<void>(
     context: context,
@@ -38,21 +38,26 @@ Future<void> showSaveSentenceSheet(
       categoryId: categoryId,
       nextPosition: nextPosition,
       folderName: folderName,
+      allowMySentences: allowMySentences,
     ),
   );
 }
+
+enum _SaveTarget { mySentences, tile }
 
 class _SaveSentenceForm extends ConsumerStatefulWidget {
   final String profileId;
   final String? categoryId;
   final int nextPosition;
   final String folderName;
+  final bool allowMySentences;
 
   const _SaveSentenceForm({
     required this.profileId,
     required this.categoryId,
     required this.nextPosition,
     required this.folderName,
+    required this.allowMySentences,
   });
 
   @override
@@ -61,12 +66,14 @@ class _SaveSentenceForm extends ConsumerStatefulWidget {
 
 class _SaveSentenceFormState extends ConsumerState<_SaveSentenceForm> {
   late final TextEditingController _name;
+  late _SaveTarget _target;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: ref.read(sentenceProvider).text);
+    _target = widget.allowMySentences ? _SaveTarget.mySentences : _SaveTarget.tile;
   }
 
   @override
@@ -76,15 +83,34 @@ class _SaveSentenceFormState extends ConsumerState<_SaveSentenceForm> {
   }
 
   Future<void> _save() async {
+    if (_target == _SaveTarget.mySentences) {
+      await _saveToMySentences();
+    } else {
+      await _saveAsTile();
+    }
+  }
+
+  Future<void> _saveToMySentences() async {
+    final l10n = AppLocalizations.of(context)!;
+    final items = ref.read(sentenceProvider).items;
+    final added = await ref.read(savedSentencesProvider(widget.profileId).notifier).add(items);
+    if (!mounted) return;
+    Navigator.pop(context);
+    showToast(context, added ? l10n.sentenceSavedToMine : l10n.sentenceAlreadySaved);
+  }
+
+  Future<void> _saveAsTile() async {
     final l10n = AppLocalizations.of(context)!;
     final name = _name.text.trim();
     if (name.isEmpty) return;
     setState(() => _saving = true);
     try {
       final items = ref.read(sentenceProvider).items;
+      final libraryRepoFuture = ref.read(librarySymbolRepositoryProvider.future);
+      final symbolRepoFuture = ref.read(categorySymbolRepositoryProvider.future);
       final collage = await renderSentenceCollage(items);
-      final libraryRepo = await ref.read(librarySymbolRepositoryProvider.future);
-      final symbolRepo = await ref.read(categorySymbolRepositoryProvider.future);
+      final libraryRepo = await libraryRepoFuture;
+      final symbolRepo = await symbolRepoFuture;
       final now = DateTime.now();
       final lib = LibrarySymbolModel(
         id: const Uuid().v4(),
@@ -159,22 +185,55 @@ class _SaveSentenceFormState extends ConsumerState<_SaveSentenceForm> {
               if (visuals.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('💬', style: TextStyle(fontSize: 44)),
+                  child: Icon(Icons.chat_rounded, size: 44, color: AppColors.ink),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _name,
-          textCapitalization: TextCapitalization.none,
-          decoration: InputDecoration(labelText: l10n.tileName),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
-          l10n.saveSentenceWhere(widget.folderName),
-          style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700),
+          ref.read(sentenceProvider).text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
+        if (widget.allowMySentences) ...[
+          const SizedBox(height: 14),
+          SegmentedButton<_SaveTarget>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: _SaveTarget.mySentences,
+                icon: const Icon(Icons.forum_rounded),
+                label: Text(l10n.mySentences),
+              ),
+              ButtonSegment(
+                value: _SaveTarget.tile,
+                icon: const Icon(Icons.crop_square_rounded),
+                label: Text(l10n.saveAsTileOption),
+              ),
+            ],
+            selected: {_target},
+            onSelectionChanged: (s) => setState(() => _target = s.first),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (_target == _SaveTarget.mySentences)
+          Text(
+            l10n.saveToMineHint,
+            style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700),
+          )
+        else ...[
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.none,
+            decoration: InputDecoration(labelText: l10n.tileName),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.saveSentenceWhere(widget.folderName),
+            style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700),
+          ),
+        ],
         const SizedBox(height: 18),
         FilledButton.icon(
           onPressed: _saving ? null : _save,
@@ -212,7 +271,7 @@ Future<String?> renderSentenceCollage(List<SentenceItem> items) async {
   for (var i = 0; i < visuals.length; i++) {
     final item = visuals[i];
     final cell = cells[i].deflate(12);
-    final image = await _loadImage(item.imagePath);
+    final image = await loadUiImage(item.imagePath);
     if (image != null) {
       paintImage(
         canvas: canvas,
@@ -267,26 +326,5 @@ List<Rect> _cells(int count, double s) {
         Rect.fromLTWH(0, h, h, h),
         Rect.fromLTWH(h, h, h, h),
       ];
-  }
-}
-
-Future<ui.Image?> _loadImage(String? path) async {
-  if (path == null || path.isEmpty) return null;
-  try {
-    Uint8List bytes;
-    if (path.startsWith('assets/')) {
-      final data = await rootBundle.load(resolveAssetPath(path));
-      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    } else {
-      final file = File(path);
-      if (!await file.exists()) return null;
-      bytes = await file.readAsBytes();
-    }
-    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 256);
-    final frame = await codec.getNextFrame();
-    codec.dispose();
-    return frame.image;
-  } catch (_) {
-    return null;
   }
 }

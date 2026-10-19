@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/board_provider.dart';
+import 'app_sheet.dart';
 import 'symbol_image.dart';
 
 /// Arkusz zmiany kolejności kafelków. Zwraca nową kolejność albo null.
@@ -36,7 +37,7 @@ class _ReorderSheetState extends State<_ReorderSheet> {
     return SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + sheetBottomInset(context)),
         child: Column(
           children: [
             Center(

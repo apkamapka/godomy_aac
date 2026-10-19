@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/services/app_settings.dart';
 import '../providers/caregiver_provider.dart';
 import '../providers/sentence_provider.dart';
+import 'scan_scope.dart';
 import 'symbol_image.dart';
 
 /// Pasek zdania w kształcie dymka z dużym przyciskiem „Mów”.
@@ -15,7 +17,9 @@ import 'symbol_image.dart';
 /// * dotknięcie dymka – przeczytaj całe zdanie,
 /// * przytrzymanie słowa – usuń je,
 /// * ⌫ – usuń ostatnie słowo, przytrzymanie ⌫ – wyczyść wszystko,
-/// * ⌨ – dopisz własny tekst.
+/// * ⌨ – dopisz własny tekst,
+/// * „Pokaż” – zdanie na cały ekran dla rozmówcy,
+/// * „Zapisz” (opiekun) – do „Moich zdań” albo jako kafelek.
 class SentenceBar extends ConsumerStatefulWidget {
   /// Zdjęcie profilu – pokazywane zamiast obrazka przy słowie „ja”.
   final String? jaPhotoPath;
@@ -23,8 +27,11 @@ class SentenceBar extends ConsumerStatefulWidget {
   /// Miejsce, do którego „wlatują” obrazki z kafelków.
   final GlobalKey flyTargetKey;
 
-  /// Zapis zdania jako kafelka (tylko w trybie opiekuna).
-  final VoidCallback? onSaveAsTile;
+  /// Zapis zdania (tylko w trybie opiekuna).
+  final VoidCallback? onSave;
+
+  /// Pokazanie zdania rozmówcy na całym ekranie (null = funkcja wyłączona).
+  final VoidCallback? onShow;
 
   final bool compact;
 
@@ -32,7 +39,8 @@ class SentenceBar extends ConsumerStatefulWidget {
     super.key,
     required this.flyTargetKey,
     this.jaPhotoPath,
-    this.onSaveAsTile,
+    this.onSave,
+    this.onShow,
     this.compact = false,
   });
 
@@ -64,10 +72,15 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
     final notifier = ref.read(sentenceProvider.notifier);
     if (ref.read(sentenceProvider).speaking) {
       await notifier.stop();
-    } else {
-      HapticFeedback.lightImpact();
-      await notifier.speakAll();
+      return;
     }
+    // Ochrona przed przypadkowym, wielokrotnym dotknięciem (ustawienie profilu).
+    if (!ref.read(caregiverModeProvider)) {
+      final guardMs = ref.read(activeProfileSettingsProvider).repeatGuardMs;
+      if (!ref.read(touchGuardProvider).tryActivate(guardMs)) return;
+    }
+    HapticFeedback.lightImpact();
+    await notifier.speakAll();
   }
 
   Future<void> _typeText() async {
@@ -113,6 +126,24 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
     final chipH = widget.compact ? 54.0 : 64.0;
     final bubbleH = chipH + 20;
     final hasItems = sentence.items.isNotEmpty;
+
+    // Przyciski na końcu zdania: „Pokaż” i (dla opiekuna) „Zapisz”.
+    final trailingChips = <Widget>[
+      if (widget.onShow != null)
+        _ActionChip(
+          height: chipH,
+          icon: Icons.open_in_full_rounded,
+          label: l10n.showToPartner,
+          onTap: widget.onShow!,
+        ),
+      if (caregiver && widget.onSave != null && sentence.items.length > 1)
+        _ActionChip(
+          height: chipH,
+          icon: Icons.bookmark_add_rounded,
+          label: l10n.saveAsTile,
+          onTap: widget.onSave!,
+        ),
+    ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 14),
@@ -169,7 +200,7 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
                                 controller: _scroll,
                                 scrollDirection: Axis.horizontal,
                                 padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
-                                itemCount: sentence.items.length + 1 + (caregiver && widget.onSaveAsTile != null && sentence.items.length > 1 ? 1 : 0),
+                                itemCount: sentence.items.length + 1 + trailingChips.length,
                                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                                 itemBuilder: (context, index) {
                                   if (index < sentence.items.length) {
@@ -190,7 +221,7 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
                                     // Cel animacji „wlatywania”.
                                     return SizedBox(key: widget.flyTargetKey, width: chipH * 0.85, height: chipH);
                                   }
-                                  return _SaveChip(height: chipH, onTap: widget.onSaveAsTile!);
+                                  return trailingChips[index - sentence.items.length - 1];
                                 },
                               )
                             : Row(
@@ -216,19 +247,23 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
                     Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _SmallBarButton(
-                          icon: Icons.backspace_rounded,
-                          height: widget.compact ? 30 : 34,
-                          tooltip: l10n.deleteLastHint,
-                          onTap: hasItems && !sentence.speaking
-                              ? () => ref.read(sentenceProvider.notifier).removeLast()
-                              : null,
-                          onLongPress: hasItems && !sentence.speaking
-                              ? () {
-                                  HapticFeedback.mediumImpact();
-                                  ref.read(sentenceProvider.notifier).clear();
-                                }
-                              : null,
+                        ScanTarget(
+                          radius: 11,
+                          onSelect: (_) => ref.read(sentenceProvider.notifier).removeLast(),
+                          child: _SmallBarButton(
+                            icon: Icons.backspace_rounded,
+                            height: widget.compact ? 30 : 34,
+                            tooltip: l10n.deleteLastHint,
+                            onTap: hasItems && !sentence.speaking
+                                ? () => ref.read(sentenceProvider.notifier).removeLast()
+                                : null,
+                            onLongPress: hasItems && !sentence.speaking
+                                ? () {
+                                    HapticFeedback.mediumImpact();
+                                    ref.read(sentenceProvider.notifier).clear();
+                                  }
+                                : null,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         _SmallBarButton(
@@ -247,12 +282,18 @@ class _SentenceBarState extends ConsumerState<SentenceBar> {
             Positioned(
               right: 6,
               top: (bubbleH - speakSize) / 2,
-              child: _SpeakButton(
-                size: speakSize,
-                enabled: hasItems,
-                speaking: sentence.speaking,
-                label: sentence.speaking ? l10n.stop : l10n.speak,
-                onTap: hasItems ? _speakOrStop : null,
+              child: ScanTarget(
+                radius: speakSize / 2,
+                onSelect: (_) {
+                  if (ref.read(sentenceProvider).items.isNotEmpty) _speakOrStop();
+                },
+                child: _SpeakButton(
+                  size: speakSize,
+                  enabled: hasItems,
+                  speaking: sentence.speaking,
+                  label: sentence.speaking ? l10n.stop : l10n.speak,
+                  onTap: hasItems ? _speakOrStop : null,
+                ),
               ),
             ),
           ],
@@ -361,34 +402,45 @@ class _SentenceChip extends StatelessWidget {
   }
 }
 
-class _SaveChip extends StatelessWidget {
+class _ActionChip extends StatelessWidget {
   final double height;
+  final IconData icon;
+  final String label;
   final VoidCallback onTap;
-  const _SaveChip({required this.height, required this.onTap});
+
+  const _ActionChip({
+    required this.height,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: height,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppColors.skySoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.sky, width: 2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.bookmark_add_rounded, color: AppColors.skyDeep),
-            const SizedBox(width: 4),
-            Text(
-              l10n.saveAsTile,
-              style: const TextStyle(color: AppColors.skyDeep, fontWeight: FontWeight.w900),
-            ),
-          ],
+    return ScanTarget(
+      radius: 12,
+      onSelect: (_) => onTap(),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.skySoft,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.sky, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.skyDeep),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(color: AppColors.skyDeep, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
         ),
       ),
     );

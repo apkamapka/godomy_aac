@@ -31,6 +31,10 @@ class BoardGrid extends StatelessWidget {
   /// Czy w poziomie podwajać kolumny (tablice tak; arkusze z gotowym układem nie).
   final bool adaptToLandscape;
 
+  /// Buduje od razu wszystkie kafelki (także niewidoczne) – potrzebne przy
+  /// skanowaniu, które przechodzi po wszystkich elementach.
+  final bool buildAll;
+
   const BoardGrid({
     super.key,
     required this.columns,
@@ -41,6 +45,7 @@ class BoardGrid extends StatelessWidget {
     this.spacing = 10,
     this.minTileHeight = 84,
     this.adaptToLandscape = true,
+    this.buildAll = false,
   });
 
   @override
@@ -56,6 +61,7 @@ class BoardGrid extends StatelessWidget {
         final tileH = math.max(minTileHeight, (availableH - spacing * (rws - 1)) / rws);
         return GridView.builder(
           padding: padding,
+          cacheExtent: buildAll ? 100000 : null,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cols,
             mainAxisSpacing: spacing,

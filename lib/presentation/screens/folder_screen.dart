@@ -24,8 +24,10 @@ import '../widgets/board_grid.dart';
 import '../widgets/caregiver_lock.dart';
 import '../widgets/edit_toolbar.dart';
 import '../widgets/grid_config_dialog.dart';
+import '../widgets/print_board.dart';
 import '../widgets/reorder_sheet.dart';
 import '../widgets/save_sentence_sheet.dart';
+import '../widgets/scan_scope.dart';
 import '../widgets/sentence_bar.dart';
 import '../widgets/symbol_image.dart';
 import '../widgets/tile_actions.dart';
@@ -291,62 +293,75 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     final landscape = BoardGridLayout.isLandscape(screen);
     final compact = screen.height < 560;
     final showSentence = settings.showSentenceBar && !isSystemBoard;
+    final scanning = settings.scanning && !caregiver;
 
     return Scaffold(
       drawer: _isRoot && caregiver ? AppDrawer(profileId: widget.profileId, profile: profile) : null,
       body: SafeArea(
         bottom: !caregiver,
-        child: Column(
-          children: [
-            _buildTopBar(context, profile, category, caregiver, isSystemBoard, screen.width),
-            if (showSentence)
-              SentenceBar(
-                flyTargetKey: _flyTarget,
-                jaPhotoPath: profile?.photoPath,
-                compact: compact,
-                onSaveAsTile: caregiver
-                    ? () => showSaveSentenceSheet(
-                          context,
-                          profileId: widget.profileId,
-                          categoryId: widget.categoryId,
-                          nextPosition: _nextPosition(items),
-                          folderName: category?.name ?? l10n.startBoard,
-                        )
-                    : null,
-              ),
-            if (caregiver) _CaregiverStrip(deleteMode: deleteMode),
-            if (_isRoot && settings.showCoreWords && !(landscape && compact))
-              _buildCoreBand(profile, settings, caregiver),
-            Expanded(
-              child: itemsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text(l10n.error(e.toString()))),
-                data: (items) {
-                  if (items.isEmpty) {
-                    return _EmptyBoard(
-                      caregiver: caregiver,
-                      isRoot: _isRoot,
-                      onAdd: () => _showAddSheet(allowFolders: !isSystemBoard),
+        child: ScanScope(
+          enabled: scanning,
+          interval: Duration(milliseconds: settings.scanIntervalMs),
+          tapAreaTop: _topBarHeight,
+          child: Column(
+            children: [
+              _buildTopBar(context, profile, category, caregiver, isSystemBoard, screen.width, settings),
+              if (showSentence)
+                SentenceBar(
+                  flyTargetKey: _flyTarget,
+                  jaPhotoPath: settings.jaPhoto ? profile?.photoPath : null,
+                  compact: compact,
+                  onShow: settings.showToPartner
+                      ? () => context.push('/folder/${widget.profileId}/show')
+                      : null,
+                  onSave: caregiver
+                      ? () => showSaveSentenceSheet(
+                            context,
+                            profileId: widget.profileId,
+                            categoryId: widget.categoryId,
+                            nextPosition: _nextPosition(items),
+                            folderName: category?.name ?? l10n.startBoard,
+                            allowMySentences: settings.showSentences,
+                          )
+                      : null,
+                ),
+              if (caregiver) _CaregiverStrip(deleteMode: deleteMode),
+              if (_isRoot && settings.showCoreWords && !(landscape && compact))
+                _buildCoreBand(profile, settings, caregiver),
+              Expanded(
+                child: itemsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text(l10n.error(e.toString()))),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return _EmptyBoard(
+                        caregiver: caregiver,
+                        isRoot: _isRoot,
+                        onAdd: () => _showAddSheet(allowFolders: !isSystemBoard),
+                      );
+                    }
+                    return BoardGrid(
+                      columns: columns,
+                      rows: rows,
+                      padding: EdgeInsets.fromLTRB(12, caregiver ? 14 : 6, 12, 12),
+                      // Przy skanowaniu budujemy wszystkie kafelki (także poza
+                      // ekranem), żeby można je było po kolei podświetlać.
+                      buildAll: scanning,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => _buildTile(
+                        items[index],
+                        profile: profile,
+                        settings: settings,
+                        mode: mode,
+                        caregiver: caregiver,
+                        deleteMode: deleteMode,
+                      ),
                     );
-                  }
-                  return BoardGrid(
-                    columns: columns,
-                    rows: rows,
-                    padding: EdgeInsets.fromLTRB(12, caregiver ? 14 : 6, 12, 12),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) => _buildTile(
-                      items[index],
-                      profile: profile,
-                      settings: settings,
-                      mode: mode,
-                      caregiver: caregiver,
-                      deleteMode: deleteMode,
-                    ),
-                  );
-                },
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: caregiver
@@ -355,12 +370,23 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
               onAdd: () => _showAddSheet(allowFolders: !isSystemBoard),
               onReorder: () => _reorder(items),
               onGrid: () => _configureGrid(columns, rows),
+              onPrint: items.isEmpty
+                  ? null
+                  : () => _printBoard(
+                        items,
+                        columns: columns,
+                        title: category?.name ?? profile?.name ?? l10n.startBoard,
+                        profile: profile,
+                        settings: settings,
+                      ),
               onToggleDelete: () => ref.read(deleteModeProvider.notifier).state = !deleteMode,
               onDone: () => setCaregiverMode(ref, false),
             )
           : null,
     );
   }
+
+  static const double _topBarHeight = 60;
 
   int _nextPosition(List<BoardItem> items) {
     var maxPos = -1;
@@ -379,28 +405,33 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     required bool deleteMode,
     bool dense = false,
   }) {
-    final isJa = isJaItem(item, profile);
-    return AacTile(
-      label: item.name,
-      imagePath: isJa ? profile!.photoPath : item.imagePath,
-      emoji: item.emoji,
-      imageFit: isJa ? BoxFit.cover : BoxFit.contain,
-      color: item.color,
-      isFolder: item.isFolder,
-      hasRecording: item.hasRecording,
-      dense: dense,
-      showEdit: caregiver && !deleteMode,
-      showDelete: caregiver && deleteMode,
-      onTap: (rect) => _onTileTap(
-        item,
-        rect,
-        mode: mode,
-        settings: settings,
-        deleteMode: caregiver && deleteMode,
+    final isJa = isJaItem(item, profile, enabled: settings.jaPhoto);
+    void onSelect(Rect rect) => _onTileTap(
+          item,
+          rect,
+          mode: mode,
+          settings: settings,
+          deleteMode: caregiver && deleteMode,
+        );
+    return ScanTarget(
+      radius: 18,
+      onSelect: onSelect,
+      child: AacTile(
+        label: item.name,
+        imagePath: isJa ? profile!.photoPath : item.imagePath,
+        emoji: item.emoji,
+        imageFit: isJa ? BoxFit.cover : BoxFit.contain,
+        color: item.color,
+        isFolder: item.isFolder,
+        hasRecording: item.hasRecording,
+        dense: dense,
+        showEdit: caregiver && !deleteMode,
+        showDelete: caregiver && deleteMode,
+        onTap: onSelect,
+        onLongPress: caregiver ? () => _editItem(item) : null,
+        onEdit: () => _editItem(item),
+        onDelete: () => _deleteItem(item),
       ),
-      onLongPress: caregiver ? () => _editItem(item) : null,
-      onEdit: () => _editItem(item),
-      onDelete: () => _deleteItem(item),
     );
   }
 
@@ -409,11 +440,9 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     ProfileSettings settings,
     bool caregiver,
   ) {
-    final boardAsync = ref.watch(systemBoardProvider((widget.profileId, SystemBoard.core)));
-    final board = boardAsync.valueOrNull;
+    final words = _coreWords();
+    final board = ref.watch(systemBoardProvider((widget.profileId, SystemBoard.core))).valueOrNull;
     if (board == null) return const SizedBox.shrink();
-    final itemsAsync = ref.watch(boardItemsProvider((profileId: widget.profileId, categoryId: board.id)));
-    final words = (itemsAsync.valueOrNull ?? const <BoardItem>[]).where((i) => !i.isFolder).toList();
     if (words.isEmpty && !caregiver) return const SizedBox.shrink();
 
     return CoreWordsBand(
@@ -433,6 +462,106 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     );
   }
 
+  /// Słowa kluczowe profilu (puste, dopóki tablica systemowa się nie wczyta).
+  List<BoardItem> _coreWords() {
+    final board = ref.watch(systemBoardProvider((widget.profileId, SystemBoard.core))).valueOrNull;
+    if (board == null) return const [];
+    final itemsAsync = ref.watch(boardItemsProvider((profileId: widget.profileId, categoryId: board.id)));
+    return (itemsAsync.valueOrNull ?? const <BoardItem>[]).where((i) => !i.isFolder).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Wydruk
+  // ---------------------------------------------------------------------------
+
+  Future<void> _printBoard(
+    List<BoardItem> items, {
+    required int columns,
+    required String title,
+    required ProfileModel? profile,
+    required ProfileSettings settings,
+  }) async {
+    // Słowa kluczowe tylko z tablicy startowej (jeśli są widoczne).
+    final core = _isRoot && settings.showCoreWords
+        ? _readCoreWords()
+        : const <BoardItem>[];
+    String? jaPhoto(BoardItem item) =>
+        isJaItem(item, profile, enabled: settings.jaPhoto) ? profile!.photoPath : null;
+    await showPrintBoardSheet(
+      context,
+      title: title,
+      items: items,
+      coreWords: core,
+      initialColumns: columns,
+      photoFor: jaPhoto,
+    );
+  }
+
+  List<BoardItem> _readCoreWords() {
+    final board = ref.read(systemBoardProvider((widget.profileId, SystemBoard.core))).valueOrNull;
+    if (board == null) return const [];
+    final items = ref.read(boardItemsProvider((profileId: widget.profileId, categoryId: board.id))).valueOrNull;
+    return (items ?? const <BoardItem>[]).where((i) => !i.isFolder).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Górny pasek
+  // ---------------------------------------------------------------------------
+
+  List<_TopAction> _rootActions(AppLocalizations l10n, ProfileSettings settings) {
+    final pid = widget.profileId;
+    return [
+      if (settings.showYesNo)
+        _TopAction(Icons.thumbs_up_down_rounded, l10n.yesNo, AppColors.leaf, () => context.push('/folder/$pid/yes-no')),
+      if (settings.showSentences)
+        _TopAction(Icons.forum_rounded, l10n.mySentences, AppColors.grape, () => context.push('/folder/$pid/sentences')),
+      if (settings.showFrequent)
+        _TopAction(Icons.star_rounded, l10n.frequent, AppColors.sunDeep, () => context.push('/folder/$pid/frequent')),
+      if (settings.showSchedule)
+        _TopAction(Icons.event_note_rounded, l10n.schedule, AppColors.sky, () => context.push('/folder/$pid/schedule')),
+    ];
+  }
+
+  Future<void> _showMoreSheet(List<_TopAction> actions, ProfileSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
+    final scanning = settings.scanning && !ref.read(caregiverModeProvider);
+    return showAppSheet<void>(
+      context: context,
+      title: l10n.more,
+      builder: (sheetContext) {
+        void run(_TopAction a) {
+          Navigator.pop(sheetContext);
+          a.onTap();
+        }
+
+        return ScanScope(
+          enabled: scanning,
+          interval: Duration(milliseconds: settings.scanIntervalMs),
+          child: Row(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(
+                  child: ScanTarget(
+                    radius: 20,
+                    onSelect: (_) => run(actions[i]),
+                    child: BigActionButton(
+                      icon: actions[i].icon,
+                      label: actions[i].label,
+                      color: actions[i].color,
+                      height: 100,
+                      onTap: () => run(actions[i]),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTopBar(
     BuildContext context,
     ProfileModel? profile,
@@ -440,96 +569,161 @@ class _FolderScreenState extends ConsumerState<FolderScreen> {
     bool caregiver,
     bool isSystemBoard,
     double width,
+    ProfileSettings settings,
   ) {
     final l10n = AppLocalizations.of(context)!;
-    final narrow = width < 400;
     final tiny = width < 380;
     final buttonSize = tiny ? 40.0 : 44.0;
     final gap = tiny ? 4.0 : 6.0;
+    final showUrgent = settings.showUrgent;
 
-    final List<Widget> leading;
+    Widget urgentButton(bool compact) => ScanTarget(
+          radius: 22,
+          onSelect: (_) => showUrgentSheet(context, widget.profileId),
+          child: UrgentButton(
+            compact: compact,
+            size: buttonSize,
+            onTap: () => showUrgentSheet(context, widget.profileId),
+          ),
+        );
+
+    Widget actionButton(_TopAction a) => ScanTarget(
+          radius: buttonSize / 2,
+          onSelect: (_) => a.onTap(),
+          child: _CircleIconButton(icon: a.icon, tooltip: a.label, size: buttonSize, onTap: a.onTap),
+        );
+
+    final children = <Widget>[];
     if (_isRoot) {
-      leading = [
-        if (caregiver)
-          Builder(
-            builder: (ctx) => _CircleIconButton(
-              icon: Icons.menu_rounded,
-              tooltip: l10n.menu,
-              size: buttonSize,
-              onTap: () => Scaffold.of(ctx).openDrawer(),
-            ),
+      final actions = _rootActions(l10n, settings);
+      final avatarSize = tiny ? 36.0 : 40.0;
+
+      // Ile miejsca zostaje na imię, przyciski funkcji i „Pilne”.
+      var fixed = 24 + avatarSize + gap + 2 + gap + 48; // marginesy, awatar, kłódka
+      if (caregiver) fixed += buttonSize + gap; // menu
+      final available = width - fixed;
+      const nameMin = 64.0;
+      double actionsWidth(int count, bool more) => (count + (more ? 1 : 0)) * (buttonSize + gap);
+      double urgentWidth(bool compact) =>
+          showUrgent ? (compact ? buttonSize : UrgentButton.fullWidth) + gap : 0.0;
+
+      var visible = actions;
+      var overflow = const <_TopAction>[];
+      var compactUrgent = false;
+      var showName = true;
+      if (actionsWidth(actions.length, false) + urgentWidth(false) + nameMin <= available) {
+        // wszystko się mieści
+      } else if (actionsWidth(actions.length, false) + urgentWidth(true) + nameMin <= available) {
+        compactUrgent = true;
+      } else if (actionsWidth(actions.length, false) + urgentWidth(true) <= available) {
+        compactUrgent = true;
+        showName = false;
+      } else {
+        compactUrgent = true;
+        showName = false;
+        var count = actions.isEmpty ? 0 : actions.length - 1;
+        while (count > 0 && actionsWidth(count, true) + urgentWidth(true) > available) {
+          count--;
+        }
+        visible = actions.sublist(0, count);
+        overflow = actions.sublist(count);
+      }
+
+      if (caregiver) {
+        children.add(Builder(
+          builder: (ctx) => _CircleIconButton(
+            icon: Icons.menu_rounded,
+            tooltip: l10n.menu,
+            size: buttonSize,
+            onTap: () => Scaffold.of(ctx).openDrawer(),
           ),
-        if (caregiver) SizedBox(width: gap),
-        ProfileAvatar(name: profile?.name ?? '', photoPath: profile?.photoPath, size: tiny ? 36 : 40),
-        SizedBox(width: gap + 2),
-        Expanded(
-          child: Text(
-            profile?.name ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+        ));
+        children.add(SizedBox(width: gap));
+      }
+      children.add(ProfileAvatar(name: profile?.name ?? '', photoPath: profile?.photoPath, size: avatarSize));
+      children.add(SizedBox(width: gap + 2));
+      children.add(Expanded(
+        child: showName
+            ? Text(
+                profile?.name ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              )
+            : const SizedBox.shrink(),
+      ));
+      for (final a in visible) {
+        children.add(actionButton(a));
+        children.add(SizedBox(width: gap));
+      }
+      if (overflow.isNotEmpty) {
+        children.add(ScanTarget(
+          radius: buttonSize / 2,
+          onSelect: (_) => _showMoreSheet(overflow, settings),
+          child: _CircleIconButton(
+            icon: Icons.more_horiz_rounded,
+            tooltip: l10n.more,
+            size: buttonSize,
+            onTap: () => _showMoreSheet(overflow, settings),
           ),
-        ),
-        _CircleIconButton(
-          icon: Icons.star_rounded,
-          tooltip: l10n.frequent,
-          size: buttonSize,
-          onTap: () => context.push('/folder/${widget.profileId}/frequent'),
-        ),
-        SizedBox(width: gap),
-        _CircleIconButton(
-          icon: Icons.event_note_rounded,
-          tooltip: l10n.schedule,
-          size: buttonSize,
-          onTap: () => context.push('/folder/${widget.profileId}/schedule'),
-        ),
-      ];
+        ));
+        children.add(SizedBox(width: gap));
+      }
+      if (showUrgent) {
+        children.add(urgentButton(compactUrgent));
+        children.add(SizedBox(width: gap));
+      }
     } else {
-      leading = [
-        _CircleIconButton(
-          icon: Icons.arrow_back_rounded,
-          tooltip: l10n.back,
-          onTap: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/folder/${widget.profileId}');
-            }
-          },
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: isSystemBoard
-              ? Text(
-                  category?.name ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
-                )
-              : _Breadcrumbs(profileId: widget.profileId, categoryId: widget.categoryId!),
-        ),
-      ];
+      void goBack() {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/folder/${widget.profileId}');
+        }
+      }
+
+      children.add(ScanTarget(
+        radius: 22,
+        onSelect: (_) => goBack(),
+        child: _CircleIconButton(icon: Icons.arrow_back_rounded, tooltip: l10n.back, onTap: goBack),
+      ));
+      children.add(const SizedBox(width: 8));
+      children.add(Expanded(
+        child: isSystemBoard
+            ? Text(
+                category?.name ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              )
+            : _Breadcrumbs(profileId: widget.profileId, categoryId: widget.categoryId!),
+      ));
+      children.add(SizedBox(width: gap));
+      if (showUrgent) {
+        children.add(urgentButton(width < 400));
+        children.add(SizedBox(width: gap));
+      }
     }
+    children.add(const LockButton());
 
     return SizedBox(
-      height: 60,
+      height: _topBarHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            ...leading,
-            SizedBox(width: gap),
-            UrgentButton(
-              compact: narrow && _isRoot,
-              onTap: () => showUrgentSheet(context, widget.profileId),
-            ),
-            SizedBox(width: gap),
-            const LockButton(),
-          ],
-        ),
+        child: Row(children: children),
       ),
     );
   }
+}
+
+/// Przycisk funkcji w górnym pasku (Tak/Nie, Moje zdania, Częste, Plan dnia).
+class _TopAction {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TopAction(this.icon, this.label, this.color, this.onTap);
 }
 
 // =============================================================================

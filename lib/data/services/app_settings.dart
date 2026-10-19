@@ -145,6 +145,8 @@ final appSettingsProvider =
 // ============================================================
 
 class ProfileSettings {
+  // --- Tablica ---------------------------------------------------------------
+
   /// Czy mówić słowo od razu po dotknięciu kafelka.
   final bool speakOnTap;
 
@@ -154,17 +156,88 @@ class ProfileSettings {
   /// Czy pokazywać słowa kluczowe na tablicy startowej.
   final bool showCoreWords;
 
+  // --- Funkcje (każde dziecko jest inne – każdą można wyłączyć) ---------------
+
+  final bool showUrgent;
+  final bool showFrequent;
+  final bool showSchedule;
+  final bool showYesNo;
+
+  /// „Moje zdania” + historia wypowiedzianych zdań.
+  final bool showSentences;
+
+  /// Przycisk „Pokaż” – zdanie na cały ekran dla rozmówcy.
+  final bool showToPartner;
+
+  /// Zdjęcie profilu zamiast obrazka na kafelku „ja”.
+  final bool jaPhoto;
+
+  /// Animacje (wlatywanie obrazka, wciskanie kafelka).
+  final bool animations;
+
+  // --- Dostępność -------------------------------------------------------------
+
+  /// Kafelek działa dopiero po przytrzymaniu (ms). 0 = zwykłe dotknięcie.
+  final int holdMs;
+
+  /// Przez tyle ms po wybraniu kafelka kolejne dotknięcia są ignorowane.
+  final int repeatGuardMs;
+
+  /// Skanowanie: kafelki podświetlają się po kolei, dotyk ekranu wybiera.
+  final bool scanning;
+  final int scanIntervalMs;
+
   const ProfileSettings({
     this.speakOnTap = true,
     this.showSentenceBar = true,
     this.showCoreWords = true,
+    this.showUrgent = true,
+    this.showFrequent = true,
+    this.showSchedule = true,
+    this.showYesNo = true,
+    this.showSentences = true,
+    this.showToPartner = true,
+    this.jaPhoto = true,
+    this.animations = true,
+    this.holdMs = 0,
+    this.repeatGuardMs = 0,
+    this.scanning = false,
+    this.scanIntervalMs = 1500,
   });
 
-  ProfileSettings copyWith({bool? speakOnTap, bool? showSentenceBar, bool? showCoreWords}) {
+  ProfileSettings copyWith({
+    bool? speakOnTap,
+    bool? showSentenceBar,
+    bool? showCoreWords,
+    bool? showUrgent,
+    bool? showFrequent,
+    bool? showSchedule,
+    bool? showYesNo,
+    bool? showSentences,
+    bool? showToPartner,
+    bool? jaPhoto,
+    bool? animations,
+    int? holdMs,
+    int? repeatGuardMs,
+    bool? scanning,
+    int? scanIntervalMs,
+  }) {
     return ProfileSettings(
       speakOnTap: speakOnTap ?? this.speakOnTap,
       showSentenceBar: showSentenceBar ?? this.showSentenceBar,
       showCoreWords: showCoreWords ?? this.showCoreWords,
+      showUrgent: showUrgent ?? this.showUrgent,
+      showFrequent: showFrequent ?? this.showFrequent,
+      showSchedule: showSchedule ?? this.showSchedule,
+      showYesNo: showYesNo ?? this.showYesNo,
+      showSentences: showSentences ?? this.showSentences,
+      showToPartner: showToPartner ?? this.showToPartner,
+      jaPhoto: jaPhoto ?? this.jaPhoto,
+      animations: animations ?? this.animations,
+      holdMs: holdMs ?? this.holdMs,
+      repeatGuardMs: repeatGuardMs ?? this.repeatGuardMs,
+      scanning: scanning ?? this.scanning,
+      scanIntervalMs: scanIntervalMs ?? this.scanIntervalMs,
     );
   }
 
@@ -172,13 +245,41 @@ class ProfileSettings {
         'speakOnTap': speakOnTap,
         'showSentenceBar': showSentenceBar,
         'showCoreWords': showCoreWords,
+        'showUrgent': showUrgent,
+        'showFrequent': showFrequent,
+        'showSchedule': showSchedule,
+        'showYesNo': showYesNo,
+        'showSentences': showSentences,
+        'showToPartner': showToPartner,
+        'jaPhoto': jaPhoto,
+        'animations': animations,
+        'holdMs': holdMs,
+        'repeatGuardMs': repeatGuardMs,
+        'scanning': scanning,
+        'scanIntervalMs': scanIntervalMs,
       };
 
-  factory ProfileSettings.fromJson(Map<String, dynamic> json) => ProfileSettings(
-        speakOnTap: json['speakOnTap'] as bool? ?? true,
-        showSentenceBar: json['showSentenceBar'] as bool? ?? true,
-        showCoreWords: json['showCoreWords'] as bool? ?? true,
-      );
+  factory ProfileSettings.fromJson(Map<String, dynamic> json) {
+    bool b(String key, bool fallback) => json[key] as bool? ?? fallback;
+    int i(String key, int fallback) => (json[key] as num?)?.toInt() ?? fallback;
+    return ProfileSettings(
+      speakOnTap: b('speakOnTap', true),
+      showSentenceBar: b('showSentenceBar', true),
+      showCoreWords: b('showCoreWords', true),
+      showUrgent: b('showUrgent', true),
+      showFrequent: b('showFrequent', true),
+      showSchedule: b('showSchedule', true),
+      showYesNo: b('showYesNo', true),
+      showSentences: b('showSentences', true),
+      showToPartner: b('showToPartner', true),
+      jaPhoto: b('jaPhoto', true),
+      animations: b('animations', true),
+      holdMs: i('holdMs', 0).clamp(0, 3000),
+      repeatGuardMs: i('repeatGuardMs', 0).clamp(0, 5000),
+      scanning: b('scanning', false),
+      scanIntervalMs: i('scanIntervalMs', 1500).clamp(500, 6000),
+    );
+  }
 }
 
 class ProfileSettingsNotifier extends FamilyNotifier<ProfileSettings, String> {
@@ -206,6 +307,37 @@ final profileSettingsProvider =
     NotifierProvider.family<ProfileSettingsNotifier, ProfileSettings, String>(
   ProfileSettingsNotifier.new,
 );
+
+/// Aktualnie używany profil (ostatnio otwarta tablica).
+final activeProfileIdProvider = Provider<String?>(
+  (ref) => ref.watch(appSettingsProvider.select((s) => s.lastProfileId)),
+);
+
+/// Ustawienia aktualnego profilu – dla widżetów, które nie znają profilu
+/// (np. kafelek: przytrzymanie, animacje).
+final activeProfileSettingsProvider = Provider<ProfileSettings>((ref) {
+  final id = ref.watch(activeProfileIdProvider);
+  if (id == null) return const ProfileSettings();
+  return ref.watch(profileSettingsProvider(id));
+});
+
+/// Ochrona przed przypadkowym, wielokrotnym dotknięciem.
+class TouchGuard {
+  DateTime? _last;
+
+  /// Czy wolno teraz aktywować kafelek/przycisk. Zapamiętuje czas aktywacji.
+  bool tryActivate(int guardMs) {
+    final now = DateTime.now();
+    final last = _last;
+    if (guardMs > 0 && last != null && now.difference(last).inMilliseconds < guardMs) {
+      return false;
+    }
+    _last = now;
+    return true;
+  }
+}
+
+final touchGuardProvider = Provider<TouchGuard>((ref) => TouchGuard());
 
 // ============================================================
 // Statystyki użycia (ekran „Częste”) i postęp planu dnia

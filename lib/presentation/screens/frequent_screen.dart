@@ -6,9 +6,11 @@ import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/app_settings.dart';
 import '../providers/board_provider.dart';
+import '../providers/caregiver_provider.dart';
 import '../widgets/aac_tile.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/board_grid.dart';
+import '../widgets/scan_scope.dart';
 import '../widgets/sentence_bar.dart';
 import '../widgets/tile_actions.dart';
 
@@ -47,104 +49,133 @@ class _FrequentScreenState extends ConsumerState<FrequentScreen> {
     final itemsAsync = ref.watch(frequentItemsProvider(widget.profileId));
     final profile = ref.watch(profileProvider(widget.profileId)).valueOrNull;
     final settings = ref.watch(profileSettingsProvider(widget.profileId));
+    final caregiver = ref.watch(caregiverModeProvider);
+    final scanning = settings.scanning && !caregiver;
     final compact = MediaQuery.sizeOf(context).height < 560;
+
+    void back() {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/folder/${widget.profileId}');
+      }
+    }
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 60,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: () => context.pop(),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.star_rounded, color: AppColors.sunDeep, size: 28),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        l10n.frequent,
-                        style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+        child: ScanScope(
+          enabled: scanning,
+          interval: Duration(milliseconds: settings.scanIntervalMs),
+          tapAreaTop: 60,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 60,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      ScanTarget(
+                        radius: 22,
+                        onSelect: (_) => back(),
+                        child: IconButton.filledTonal(
+                          tooltip: l10n.back,
+                          onPressed: back,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                        ),
                       ),
-                    ),
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert_rounded, color: palette.ink),
-                      onSelected: (_) => _resetStats(),
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: 'reset', child: Text(l10n.frequentReset)),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      const Icon(Icons.star_rounded, color: AppColors.sunDeep, size: 28),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          l10n.frequent,
+                          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded, color: palette.ink),
+                        onSelected: (_) => _resetStats(),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(value: 'reset', child: Text(l10n.frequentReset)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (settings.showSentenceBar)
-              SentenceBar(
-                flyTargetKey: _flyTarget,
-                jaPhotoPath: profile?.photoPath,
-                compact: compact,
-              ),
-            Expanded(
-              child: itemsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text(l10n.error(e.toString()))),
-                data: (items) {
-                  if (items.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('⭐', style: TextStyle(fontSize: 52)),
-                            const SizedBox(height: 10),
-                            Text(
-                              l10n.frequentEmpty,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700, fontSize: 16),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  return BoardGrid(
-                    columns: 4,
-                    rows: 4,
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final isJa = isJaItem(item, profile);
-                      return AacTile(
-                        label: item.name,
-                        imagePath: isJa ? profile!.photoPath : item.imagePath,
-                        emoji: item.emoji,
-                        imageFit: isJa ? BoxFit.cover : BoxFit.contain,
-                        color: item.color,
-                        hasRecording: item.hasRecording,
-                        onTap: (rect) => handleSymbolTap(
-                          context: context,
-                          ref: ref,
-                          profileId: widget.profileId,
-                          item: item,
-                          rect: rect,
-                          direct: false,
-                          settings: settings,
-                          flyTarget: _flyTarget,
-                          profile: profile,
+              if (settings.showSentenceBar)
+                SentenceBar(
+                  flyTargetKey: _flyTarget,
+                  jaPhotoPath: settings.jaPhoto ? profile?.photoPath : null,
+                  compact: compact,
+                  onShow: settings.showToPartner
+                      ? () => context.push('/folder/${widget.profileId}/show')
+                      : null,
+                ),
+              Expanded(
+                child: itemsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text(l10n.error(e.toString()))),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('⭐', style: TextStyle(fontSize: 52)),
+                              const SizedBox(height: 10),
+                              Text(
+                                l10n.frequentEmpty,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: palette.inkSoft, fontWeight: FontWeight.w700, fontSize: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       );
-                    },
-                  );
-                },
+                    }
+                    return BoardGrid(
+                      columns: 4,
+                      rows: 4,
+                      buildAll: scanning,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final isJa = isJaItem(item, profile, enabled: settings.jaPhoto);
+                        void onSelect(Rect rect) => handleSymbolTap(
+                              context: context,
+                              ref: ref,
+                              profileId: widget.profileId,
+                              item: item,
+                              rect: rect,
+                              direct: false,
+                              settings: settings,
+                              flyTarget: _flyTarget,
+                              profile: profile,
+                            );
+                        return ScanTarget(
+                          radius: 18,
+                          onSelect: onSelect,
+                          child: AacTile(
+                            label: item.name,
+                            imagePath: isJa ? profile!.photoPath : item.imagePath,
+                            emoji: item.emoji,
+                            imageFit: isJa ? BoxFit.cover : BoxFit.contain,
+                            color: item.color,
+                            hasRecording: item.hasRecording,
+                            onTap: onSelect,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

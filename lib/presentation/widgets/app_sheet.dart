@@ -24,7 +24,7 @@ Future<T?> showAppSheet<T>({
           left: 20,
           right: 20,
           top: 10,
-          bottom: 20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          bottom: 20 + sheetBottomInset(sheetContext),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -75,6 +75,12 @@ Future<T?> showAppSheet<T>({
     },
   );
 }
+
+/// Dolny odstęp arkusza: pasek nawigacji telefonu (przyciski ◀ ● ■)
+/// albo klawiatura, jeśli jest otwarta. `showModalBottomSheet` z
+/// `useSafeArea: true` nie dolicza dołu – trzeba to zrobić w treści.
+double sheetBottomInset(BuildContext context) =>
+    MediaQuery.paddingOf(context).bottom + MediaQuery.viewInsetsOf(context).bottom;
 
 class SheetHandle extends StatelessWidget {
   const SheetHandle({super.key});

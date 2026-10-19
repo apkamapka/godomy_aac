@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/services/app_settings.dart';
+import '../providers/caregiver_provider.dart';
 import 'symbol_image.dart';
 
 /// Kafelek AAC w stylu laminowanej karty obrazkowej:
 /// kolorowa ramka (klucz Fitzgeralda), białe okienko z obrazkiem i podpis.
 /// Foldery mają „zakładkę” jak teczka.
-class AacTile extends StatefulWidget {
+class AacTile extends ConsumerStatefulWidget {
   final String label;
   final String? imagePath;
   final String? emoji;
@@ -46,19 +49,74 @@ class AacTile extends StatefulWidget {
   });
 
   @override
-  State<AacTile> createState() => _AacTileState();
+  ConsumerState<AacTile> createState() => _AacTileState();
 }
 
-class _AacTileState extends State<AacTile> {
+class _AacTileState extends ConsumerState<AacTile> with SingleTickerProviderStateMixin {
   bool _pressed = false;
+
+  /// Postęp przytrzymania (ochrona przed przypadkowym dotykiem).
+  AnimationController? _hold;
+  bool _holdFired = false;
+
+  @override
+  void dispose() {
+    _hold?.dispose();
+    super.dispose();
+  }
 
   void _setPressed(bool value) {
     if (_pressed != value && mounted) setState(() => _pressed = value);
   }
 
-  void _handleTap() {
+  /// Przytrzymanie działa tylko u dziecka (w trybie opiekuna przytrzymanie
+  /// otwiera edycję).
+  int get _holdMs {
+    if (widget.onTap == null || ref.read(caregiverModeProvider)) return 0;
+    return ref.read(activeProfileSettingsProvider).holdMs;
+  }
+
+  AnimationController _holdController(int ms) {
+    final controller = _hold ??= AnimationController(vsync: this)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed && !_holdFired) {
+          _holdFired = true;
+          _activate();
+          _hold?.reset();
+          _setPressed(false);
+        }
+      });
+    controller.duration = Duration(milliseconds: ms);
+    return controller;
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    _setPressed(true);
+    final ms = _holdMs;
+    if (ms > 0) {
+      _holdFired = false;
+      _holdController(ms).forward(from: 0);
+    }
+  }
+
+  void _onTapEnd() {
+    _setPressed(false);
+    final hold = _hold;
+    if (hold != null && hold.value > 0) hold.reset();
+  }
+
+  void _onTap() {
+    if (_holdMs > 0) return; // przy przytrzymaniu kafelek działa sam po czasie
+    _activate();
+  }
+
+  void _activate() {
     final onTap = widget.onTap;
-    if (onTap == null) return;
+    if (onTap == null || !mounted) return;
+    if (!ref.read(caregiverModeProvider)) {
+      final guardMs = ref.read(activeProfileSettingsProvider).repeatGuardMs;
+      if (!ref.read(touchGuardProvider).tryActivate(guardMs)) return;
+    }
     final box = context.findRenderObject() as RenderBox?;
     final rect = (box != null && box.hasSize)
         ? box.localToGlobal(Offset.zero) & box.size
@@ -68,6 +126,7 @@ class _AacTileState extends State<AacTile> {
 
   @override
   Widget build(BuildContext context) {
+    final animations = ref.watch(activeProfileSettingsProvider.select((s) => s.animations));
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth.isFinite ? constraints.maxWidth : 120.0;
@@ -77,19 +136,19 @@ class _AacTileState extends State<AacTile> {
           label: widget.isFolder ? '${widget.label}, folder' : widget.label,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
-            onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
-            onTapCancel: () => _setPressed(false),
-            onTap: widget.onTap == null ? null : _handleTap,
+            onTapDown: widget.onTap == null ? null : _onTapDown,
+            onTapUp: widget.onTap == null ? null : (_) => _onTapEnd(),
+            onTapCancel: _onTapEnd,
+            onTap: widget.onTap == null ? null : _onTap,
             onLongPress: widget.onLongPress,
-            child: _buildTile(context, w, h),
+            child: _buildTile(context, w, h, animations),
           ),
         );
       },
     );
   }
 
-  Widget _buildTile(BuildContext context, double w, double h) {
+  Widget _buildTile(BuildContext context, double w, double h, bool animations) {
     final color = widget.color;
     final edge = AppColors.edgeFor(color);
     final outline = AppColors.outlineFor(color);
@@ -106,7 +165,7 @@ class _AacTileState extends State<AacTile> {
     final borderWidth = widget.highlighted ? 3.5 : 2.0;
 
     final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: animations ? const Duration(milliseconds: 90) : Duration.zero,
       curve: Curves.easeOut,
       transform: Matrix4.translationValues(0, edgeDepth - depth, 0),
       height: cardHeight,
@@ -137,9 +196,12 @@ class _AacTileState extends State<AacTile> {
       ),
     );
 
+    final hold = _hold;
+    final scale = !animations ? 1.0 : (_pressed ? 0.965 : (widget.highlighted ? 1.03 : 1.0));
+
     return AnimatedScale(
-      scale: _pressed ? 0.965 : (widget.highlighted ? 1.03 : 1.0),
-      duration: const Duration(milliseconds: 110),
+      scale: scale,
+      duration: animations ? const Duration(milliseconds: 110) : Duration.zero,
       curve: Curves.easeOut,
       child: Stack(
         clipBehavior: Clip.none,
@@ -158,6 +220,30 @@ class _AacTileState extends State<AacTile> {
               ),
             ),
           Positioned(left: 0, right: 0, top: cardTop, child: card),
+          // Postęp przytrzymania – kafelek „napełnia się” od dołu.
+          if (hold != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: cardTop,
+              height: cardHeight,
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(radius),
+                  child: AnimatedBuilder(
+                    animation: hold,
+                    builder: (context, _) => Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FractionallySizedBox(
+                        widthFactor: 1,
+                        heightFactor: hold.value,
+                        child: ColoredBox(color: AppColors.sky.withValues(alpha: 0.35)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (widget.showEdit && widget.onEdit != null)
             Positioned(
               top: cardTop - 10,

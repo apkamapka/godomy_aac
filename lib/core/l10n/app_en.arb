@@ -338,7 +338,7 @@
       }
     }
   },
-  "licenses": "Licences",
+  "licenses": "Open source licenses",
   "lockExplain": "The lock protects the board from accidental changes. Choose how to open it:",
   "lockHold": "Hold the lock",
   "lockHoldDesc": "Hold the lock for 3 seconds",
@@ -494,5 +494,73 @@
   "whoIsTalking": "Who’s talking today?",
   "whoIsTalkingHint": "Choose a profile or add a new one",
   "themeLight": "Light",
-  "themeDark": "Dark"
+  "themeDark": "Dark",
+  "more": "More",
+  "yes": "Yes",
+  "no": "No",
+  "off": "Off",
+  "yesNo": "Yes / No",
+  "mySentences": "My sentences",
+  "coreWords": "Core words",
+  "print": "Print",
+  "showToPartner": "Show",
+  "flipView": "Flip",
+  "saveAsTileOption": "Tile",
+  "saveToMineHint": "The sentence goes to “My sentences” – the child can play it with one tap.",
+  "sentenceSavedToMine": "Saved to “My sentences”",
+  "sentenceAlreadySaved": "This sentence is already in “My sentences”",
+  "savedTab": "Saved",
+  "historyTab": "Recent",
+  "toSentenceBar": "To sentence bar",
+  "saveToMine": "Save to “My sentences”",
+  "deleteSentence": "Delete sentence?",
+  "historyClear": "Clear history",
+  "historyClearConfirm": "Delete all recently spoken sentences?",
+  "historyEmpty": "Sentences spoken with the “Speak” button will appear here.",
+  "mySentencesEmpty": "No saved sentences yet.",
+  "mySentencesEmptyCaregiver": "Build a sentence on the board and tap “Save” at the end of the sentence bar.",
+  "printBoardTitle": "Print board",
+  "printBoardHint": "Board “{title}” as an A4 PDF – print it from your phone or computer.",
+  "@printBoardHint": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "printColumns": "Tiles per row",
+  "printIncludeCore": "Include core words",
+  "printPreparing": "Preparing PDF…",
+  "printSavePdf": "Save PDF",
+  "printSaved": "PDF saved – open it and print",
+  "settingsFeatures": "Features for: {name}",
+  "@settingsFeatures": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "featureUrgent": "“Urgent” button",
+  "featureUrgentDesc": "Most important needs with one tap",
+  "featureYesNoDesc": "Screen with two big buttons",
+  "featureSentences": "My sentences and history",
+  "featureSentencesDesc": "Ready sentences and recently spoken ones",
+  "featureShowToPartner": "Show to partner",
+  "featureShowToPartnerDesc": "The sentence full screen in big letters",
+  "featureFrequentDesc": "Most used pictures",
+  "featureScheduleDesc": "Picture schedule: now and next",
+  "featureJaPhoto": "Photo on “I”",
+  "featureJaPhotoDesc": "The “I” tile shows the profile photo",
+  "featureAnimations": "Animations",
+  "featureAnimationsDesc": "Pictures flying into the sentence, pressing tiles",
+  "settingsAccessibility": "Accessibility",
+  "holdToActivate": "Hold to select",
+  "holdToActivateDesc": "A tile works only after holding the finger on it",
+  "repeatGuard": "Ignore repeated taps",
+  "repeatGuardDesc": "A short pause after selecting a tile",
+  "scanning": "Scanning",
+  "scanningDesc": "Tiles light up one by one – touching the screen selects",
+  "scanningSpeed": "Scanning speed",
+  "scanningHint": "Select: touch the screen anywhere or press a button (space / Enter, e.g. a Bluetooth switch). The caregiver unlocks the padlock as usual."
 }

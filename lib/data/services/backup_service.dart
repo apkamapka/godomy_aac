@@ -16,6 +16,7 @@ import '../repositories/profile_repository.dart';
 import '../repositories/category_repository.dart';
 import '../repositories/category_symbol_repository.dart';
 import '../repositories/library_symbol_repository.dart';
+import 'sentence_store.dart';
 
 /// Wersja formatu pliku kopii zapasowej.
 ///
@@ -120,6 +121,16 @@ class BackupService {
       addFile(l.imagePath);
     }
 
+    // „Moje zdania” (obrazki i nagrania słów też trafiają do kopii).
+    final savedSentences = _readSavedSentences(profileId);
+    for (final sentence in savedSentences) {
+      for (final item in (sentence['items'] as List? ?? const [])) {
+        if (item is! Map) continue;
+        addFile(item['imagePath'] as String?);
+        addFile(item['voicePath'] as String?);
+      }
+    }
+
     // Zbuduj JSON. Ścieżki plików zapisujemy jako nazwy względne w ZIP.
     final settingsRaw = prefs?.getString(_settingsKey(profileId));
     final manifest = {
@@ -127,6 +138,10 @@ class BackupService {
       'exportedAt': DateTime.now().toIso8601String(),
       'profile': _profileToJson(profile, fileMap),
       if (settingsRaw != null) 'profileSettings': jsonDecode(settingsRaw),
+      if (savedSentences.isNotEmpty)
+        'savedSentences': [
+          for (final sentence in savedSentences) _sentenceToJson(sentence, fileMap),
+        ],
       'categories':
           categories.map((c) => _categoryToJson(c, fileMap)).toList(),
       'categorySymbols':
@@ -321,6 +336,28 @@ class BackupService {
     if (importedSettings is Map && prefs != null) {
       await prefs!.setString(_settingsKey(newProfileId), jsonEncode(importedSettings));
     }
+    final importedSentences = manifest['savedSentences'];
+    if (importedSentences is List && prefs != null) {
+      final restored = <Map<String, dynamic>>[];
+      for (final sentence in importedSentences) {
+        if (sentence is! Map) continue;
+        final items = <Map<String, dynamic>>[];
+        for (final item in (sentence['items'] as List? ?? const [])) {
+          if (item is! Map) continue;
+          items.add({
+            ...Map<String, dynamic>.from(item),
+            'symbolId': null,
+            'imagePath': resolvePath(item['imagePath'] as String?),
+            'voicePath': resolvePath(item['voicePath'] as String?),
+          });
+        }
+        if (items.isEmpty) continue;
+        restored.add({...Map<String, dynamic>.from(sentence), 'items': items});
+      }
+      if (restored.isNotEmpty) {
+        await prefs!.setString(SavedSentencesNotifier.keyFor(newProfileId), jsonEncode(restored));
+      }
+    }
     for (final c in newCategories) {
       await categoryRepo.create(c);
     }
@@ -337,6 +374,40 @@ class BackupService {
 
   // ========================= SERIALIZACJA =========================
   // Ręczna - żeby ścieżki plików zamienić na nazwy względne w ZIP.
+
+  List<Map<String, dynamic>> _readSavedSentences(String profileId) {
+    final raw = prefs?.getString(SavedSentencesNotifier.keyFor(profileId));
+    if (raw == null) return const [];
+    try {
+      return [
+        for (final e in jsonDecode(raw) as List)
+          if (e is Map) Map<String, dynamic>.from(e),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Map<String, dynamic> _sentenceToJson(Map<String, dynamic> sentence, Map<String, String> fileMap) {
+    String? mapPath(String? path) {
+      if (path == null || path.isEmpty) return null;
+      if (path.startsWith('assets/')) return path;
+      return fileMap[path];
+    }
+
+    return {
+      ...sentence,
+      'items': [
+        for (final item in (sentence['items'] as List? ?? const []))
+          if (item is Map)
+            {
+              ...Map<String, dynamic>.from(item),
+              'imagePath': mapPath(item['imagePath'] as String?),
+              'voicePath': mapPath(item['voicePath'] as String?),
+            },
+      ],
+    };
+  }
 
   Map<String, dynamic> _profileToJson(ProfileModel p, Map<String, String> fileMap) => {
         'id': p.id,

@@ -224,7 +224,7 @@ class _LibraryPickerState extends ConsumerState<_LibraryPicker> {
                     );
                   }
                   return GridView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
+                    padding: EdgeInsets.only(bottom: 24 + sheetBottomInset(context)),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
                       mainAxisSpacing: 10,

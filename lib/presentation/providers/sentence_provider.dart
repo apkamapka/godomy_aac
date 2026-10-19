@@ -1,34 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/sentence_item.dart';
+import '../../data/services/app_settings.dart';
 import '../../data/services/audio_player_service.dart';
+import '../../data/services/sentence_store.dart';
 import '../../data/services/tts_service.dart';
 import 'board_provider.dart';
 
-/// Jeden element budowanego zdania.
-class SentenceItem {
-  final String key;
-  final String? symbolId;
-  final String label;
-  final String? emoji;
-  final String? imagePath;
-  final Color color;
-  final String? voicePath;
-  final bool isText;
-
-  const SentenceItem({
-    required this.key,
-    required this.label,
-    required this.color,
-    this.symbolId,
-    this.emoji,
-    this.imagePath,
-    this.voicePath,
-    this.isText = false,
-  });
-
-  bool get hasRecording => voicePath != null && voicePath!.isNotEmpty;
-}
+export '../../data/models/sentence_item.dart';
 
 class SentenceState {
   final List<SentenceItem> items;
@@ -67,7 +47,10 @@ class SentenceState {
 /// po kolei i czekamy na ich koniec.
 class SentenceNotifier extends Notifier<SentenceState> {
   int _counter = 0;
-  bool _cancel = false;
+
+  /// Numer bieżącego czytania – każde nowe czytanie albo „stop” go zmienia,
+  /// więc stara pętla (czekająca na koniec mowy) wie, że ma się zakończyć.
+  int _generation = 0;
 
   @override
   SentenceState build() => const SentenceState();
@@ -118,21 +101,65 @@ class SentenceNotifier extends Notifier<SentenceState> {
     state = const SentenceState();
   }
 
-  /// Czyta całe zdanie.
+  /// Dodaje gotowe zdanie (np. z „Moich zdań”) na koniec paska.
+  void addItems(List<SentenceItem> items) {
+    if (items.isEmpty) return;
+    state = state.copyWith(items: [
+      ...state.items,
+      for (final item in items) item.withKey(_nextKey()),
+    ]);
+  }
+
+  /// Czyta całe zdanie z paska (i zapisuje je w historii profilu).
   Future<void> speakAll() async {
     if (state.speaking || state.items.isEmpty) return;
-    _cancel = false;
     final items = List<SentenceItem>.of(state.items);
+    _recordHistory(items);
+    await _speakSequence(items, highlightInBar: true);
+  }
+
+  /// Czyta podane zdanie (np. zapisane) bez zmiany paska.
+  /// [onIndex] dostaje indeks aktualnie czytanego słowa (null na końcu).
+  Future<void> speakItems(List<SentenceItem> items, {ValueChanged<int?>? onIndex}) async {
+    if (items.isEmpty) return;
+    if (state.speaking) await stop();
+    await _speakSequence(List.of(items), highlightInBar: false, onIndex: onIndex);
+  }
+
+  void _recordHistory(List<SentenceItem> items) {
+    try {
+      final profileId = ref.read(activeProfileIdProvider);
+      if (profileId == null) return;
+      if (!ref.read(profileSettingsProvider(profileId)).showSentences) return;
+      ref.read(sentenceHistoryProvider(profileId).notifier).record(items);
+    } catch (_) {
+      // Historia nie jest krytyczna.
+    }
+  }
+
+  Future<void> _speakSequence(
+    List<SentenceItem> items, {
+    required bool highlightInBar,
+    ValueChanged<int?>? onIndex,
+  }) async {
+    final generation = ++_generation;
+    bool alive() => generation == _generation;
     final tts = ref.read(ttsServiceProvider);
     final audio = ref.read(audioPlayerServiceProvider);
 
-    state = state.copyWith(speaking: true, speakingIndex: 0);
+    void mark(int index) {
+      if (!alive()) return;
+      if (highlightInBar) _highlight(index);
+      onIndex?.call(index);
+    }
+
+    state = state.copyWith(speaking: true, speakingIndex: highlightInBar ? 0 : null);
     try {
       var i = 0;
-      while (i < items.length && !_cancel) {
+      while (i < items.length && alive()) {
         final item = items[i];
         if (item.hasRecording) {
-          _highlight(i);
+          mark(i);
           await audio.playAndWait(item.voicePath!);
           i++;
           continue;
@@ -149,11 +176,11 @@ class SentenceNotifier extends Notifier<SentenceState> {
           ranges.add((i, from, buffer.length));
           i++;
         }
-        _highlight(start);
+        mark(start);
         await tts.speak(buffer.toString(), onProgress: (charStart, charEnd) {
           for (final r in ranges) {
             if (charStart >= r.$2 && charStart <= r.$3) {
-              _highlight(r.$1);
+              mark(r.$1);
               break;
             }
           }
@@ -162,12 +189,12 @@ class SentenceNotifier extends Notifier<SentenceState> {
     } catch (_) {
       // Błąd syntezy/odtwarzania nie może zablokować paska zdania.
     } finally {
-      state = state.copyWith(speaking: false, clearSpeakingIndex: true);
+      if (alive()) state = state.copyWith(speaking: false, clearSpeakingIndex: true);
+      onIndex?.call(null);
     }
   }
 
   void _highlight(int index) {
-    if (_cancel) return;
     if (state.speakingIndex != index) {
       state = state.copyWith(speakingIndex: index);
     }
@@ -175,7 +202,8 @@ class SentenceNotifier extends Notifier<SentenceState> {
 
   /// Przerywa czytanie zdania.
   Future<void> stop() async {
-    _cancel = true;
+    _generation++;
+    state = state.copyWith(speaking: false, clearSpeakingIndex: true);
     await ref.read(ttsServiceProvider).stop();
     await ref.read(audioPlayerServiceProvider).stop();
   }

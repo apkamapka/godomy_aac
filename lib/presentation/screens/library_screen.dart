@@ -164,7 +164,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   );
                 }
                 return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, 100 + MediaQuery.paddingOf(context).bottom),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     mainAxisSpacing: 12,

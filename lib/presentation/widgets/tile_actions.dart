@@ -11,9 +11,10 @@ import '../providers/sentence_provider.dart';
 import 'fly_to_target.dart';
 import 'symbol_image.dart';
 
-/// Czy kafelek to „ja”, które pokazujemy ze zdjęciem profilu.
-bool isJaItem(BoardItem item, ProfileModel? profile) {
-  if (item.isFolder || profile == null) return false;
+/// Czy kafelek to „ja”, które pokazujemy ze zdjęciem profilu
+/// ([enabled] – ustawienie „Zdjęcie przy »ja«”).
+bool isJaItem(BoardItem item, ProfileModel? profile, {bool enabled = true}) {
+  if (!enabled || item.isFolder || profile == null) return false;
   final photo = profile.photoPath;
   return photo != null && photo.isNotEmpty && item.name.trim().toLowerCase() == 'ja';
 }
@@ -38,7 +39,15 @@ void handleSymbolTap({
   final speakOnly = direct || !settings.showSentenceBar;
   if (!speakOnly) {
     sentence.addItem(item);
-    flyToSentence(context: context, flyTarget: flyTarget, item: item, from: rect, profile: profile);
+    if (settings.animations) {
+      flyToSentence(
+        context: context,
+        flyTarget: flyTarget,
+        item: item,
+        from: rect,
+        profile: settings.jaPhoto ? profile : null,
+      );
+    }
   }
   if (speakOnly || settings.speakOnTap) {
     sentence.speakSingle(text: item.name, voicePath: item.voicePath);

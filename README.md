@@ -16,7 +16,14 @@ symbole, nagrania) przechowywane są wyłącznie lokalnie na urządzeniu.
 - **Pilne** – przycisk w górnym pasku z dużymi kafelkami mówionymi od razu (toaleta, boli, pić…)
 - **Plan dnia** z obrazków („Teraz” / „Potem”, odhaczanie kroków)
 - **Częste** – najczęściej używane słowa danego profilu
+- **Moje zdania** – gotowe zdania przygotowane przez opiekuna + **historia** wypowiedzianych zdań
+- **Tak / Nie** – ekran z dwoma dużymi przyciskami
+- **Pokaż rozmówcy** – zdanie na cały ekran dużymi literami (z obrotem o 180°)
 - **Zapis zdania jako kafelka** (kolaż obrazków)
+- **Wydruk tablicy do PDF** (A4) – papierowa tablica na basen, kąpiel, wyjazd
+- **Dostępność**: przytrzymanie kafelka, ignorowanie powtórnych dotknięć, **skanowanie**
+  (dotyk ekranu albo przełącznik Bluetooth – spacja / Enter)
+- Każdą funkcję można włączyć lub wyłączyć osobno dla każdego profilu
 - **Tryb opiekuna** za kłódką – do wyboru: zadanie dla dorosłego, PIN albo przytrzymanie
 - Kolory kafelków wg **klucza Fitzgeralda**, zdjęcie dziecka na kafelku „ja”
 - Profile użytkowników, własne foldery i obrazki (galeria / aparat / emoji), własne nagrania głosu
@@ -46,7 +53,9 @@ flutter build appbundle
 ## Grafiki
 
 Część grafik wygenerowano przy użyciu narzędzi AI (Gemini / Meta) oraz darmowych
-zasobów z Canvy.
+zasobów z Canvy. Obrazki „chcę”, „koniec” i „potrzebuję przerwy” pochodzą z
+[Noto Emoji](https://github.com/googlefonts/noto-emoji) (Apache 2.0, licencja w
+`assets/licenses`).
 
 ## Licencja
 

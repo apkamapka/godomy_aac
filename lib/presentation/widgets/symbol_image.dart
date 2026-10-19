@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 
@@ -14,6 +17,29 @@ String resolveAssetPath(String path) {
     return 'assets/symbols/$base.webp';
   }
   return path;
+}
+
+/// Wczytuje obrazek (plik albo asset) do rysowania na płótnie – np. kolaż
+/// zdania albo wydruk tablicy. Animacje (GIF/WebP) – pierwsza klatka.
+Future<ui.Image?> loadUiImage(String? path, {int targetWidth = 256}) async {
+  if (path == null || path.isEmpty) return null;
+  try {
+    Uint8List bytes;
+    if (path.startsWith('assets/')) {
+      final data = await rootBundle.load(resolveAssetPath(path));
+      bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } else {
+      final file = File(path);
+      if (!await file.exists()) return null;
+      bytes = await file.readAsBytes();
+    }
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Obrazek symbolu: plik, asset albo emoji. Dekoduje w rozmiarze kafelka
